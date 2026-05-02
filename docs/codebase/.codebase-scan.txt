@@ -1,0 +1,258 @@
+
+=== DIRECTORY TREE (max depth 3, source files only) ===
+docs
+docs\codebase
+docs\codebase\.codebase-scan.txt
+nogg-aholic-nrpc-cli-0.5.0.tgz
+package-lock.json
+package.json
+README.md
+src
+src\codec-generator.ts
+src\contract-runtime-inline-generator.ts
+src\declaration-lines-generator.ts
+src\docs-runtime.ts
+src\docs.ts
+src\endpoint-surface-generator.ts
+src\generate-codec-cli.ts
+src\generate-declaration-lines-cli.ts
+src\generate-endpoint-global-dts-cli.ts
+src\generate-endpoint-surface-cli.ts
+src\generate-graphql-openapi-surface-cli.ts
+src\generate-openapi-surface-cli.ts
+src\graphql-openapi-generator.ts
+src\graphql-openapi-smoke.ts
+src\graphql-operation-analyzer.ts
+src\graphql-postman-collection.ts
+src\http-route-generator.ts
+src\index.ts
+src\openapi-generator.ts
+src\openapi-surface-generator.ts
+src\openapi-types.ts
+src\scalar-html.ts
+src\structural-contract-generator.ts
+tsconfig.json
+
+=== STACK DETECTION (manifest files) ===
+
+--- package-lock.json ---
+{
+  "name": "@nogg-aholic/nrpc-cli",
+  "version": "0.5.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "@nogg-aholic/nrpc-cli",
+      "version": "0.5.0",
+      "license": "MIT",
+      "dependencies": {
+        "graphql": "^16.11.0",
+        "yaml": "^2.8.1"
+      },
+      "bin": {
+        "nrpc-generate-codec": "dist/generate-codec-cli.js",
+        "nrpc-generate-declaration-lines": "dist/generate-declaration-lines-cli.js",
+        "nrpc-generate-endpoint-global-dts": "dist/generate-endpoint-global-dts-cli.js",
+        "nrpc-generate-endpoint-surface": "dist/generate-endpoint-surface-cli.js",
+        "nrpc-generate-graphql-openapi-surface": "dist/generate-graphql-openapi-surface-cli.js",
+        "nrpc-generate-openapi-surface": "dist/generate-openapi-surface-cli.js"
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "@types/node": "^25.6.0",
+        "typescript": "^6.0.3"
+      },
+      "peerDependencies": {
+        "@nogg-aholic/nrpc": "^0.5.0"
+      },
+      "peerDependenciesMeta": {
+        "@nogg-aholic/nrpc": {
+          "optional": true
+        }
+      }
+    },
+    "node_modules/@types/bun": {
+      "version": "1.3.13",
+      "resolved": "https://registry.npmjs.org/@types/bun/-/bun-1.3.13.tgz",
+      "integrity": "sha512-9fqXWk5YIHGGnUau9TEi+qdlTYDAnOj+xLCmSTwXfAIqXr2x4tytJb43E9uCvt09zJURKXwAtkoH4nLQfzeTXw==",
+      "dev": true,
+      "license": "MIT",
+      "dependencies": {
+        "bun-types": "1.3.13"
+      }
+    },
+    "node_modules/@types/node": {
+      "version": "25.6.0",
+      "resolved": "https://registry.npmjs.org/@types/node/-/node-25.6.0.tgz",
+      "integrity": "sha512-+qIYRKdNYJwY3vRCZMdJbPLJAtGjQBudzZzdzwQYkEPQd+PJGixUL5QfvCLDaULoLv+RhT3LDkwEfKaAkgSmNQ==",
+      "dev": true,
+      "license": "MIT",
+      "dependencies": {
+        "undici-types": "~7.19.0"
+      }
+    },
+    "node_modules/bun-types": {
+      "version": "1.3.13",
+      "resolved": "https://registry.npmjs.org/bun-types/-/bun-types-1.3.13.tgz",
+      "integrity": "sha512-QXKeHLlOLqQX9LgYaHJfzdBaV21T63HhFJnvuRCcjZiaUDpbs5ED1MgxbMra71CsryN/1dAoXuJJJwIv/2drVA==",
+      "dev": true,
+      "license": "MIT",
+      "dependencies": {
+        "@types/node": "*"
+      }
+    },
+    "node_modules/graphql": {
+      "version": "16.13.2",
+      "resolved": "https://registry.npmjs.org/graphql/-/graphql-16.13.2.tgz",
+      "integrity": "sha512-5bJ+nf/UCpAjHM8i06fl7eLyVC9iuNAjm9qzkiu2ZGhM0VscSvS6WDPfAwkdkBuoXGM9FJSbKl6wylMwP9Ktig==",
+      "license": "MIT",
+      "engines": {
+        "node": "^12.22.0 || ^14.16.0 || ^16.0.0 || >=17.0.0"
+      }
+    },
+    "node_modules/typescript": {
+      "version": "6.0.3",
+      "resolved": "https://registry.npmjs.org/typescript/-/typescript-6.0.3.tgz",
+      "integrity": "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==",
+      "dev": true,
+
+[TRUNCATED] Showing first 80 of 113 lines.
+--- package.json ---
+{
+  "name": "@nogg-aholic/nrpc-cli",
+  "description": "Code generation and CLI tooling for nRPC.",
+  "version": "0.5.0",
+  "homepage": "https://github.com/Nogg-aholic/nRPC#readme",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "nrpc-generate-declaration-lines": "dist/generate-declaration-lines-cli.js",
+    "nrpc-generate-codec": "dist/generate-codec-cli.js",
+    "nrpc-generate-endpoint-surface": "dist/generate-endpoint-surface-cli.js",
+    "nrpc-generate-endpoint-global-dts": "dist/generate-endpoint-global-dts-cli.js",
+    "nrpc-generate-openapi-surface": "dist/generate-openapi-surface-cli.js",
+    "nrpc-generate-graphql-openapi-surface": "dist/generate-graphql-openapi-surface-cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./declaration-lines-generator": {
+      "types": "./dist/declaration-lines-generator.d.ts",
+      "import": "./dist/declaration-lines-generator.js",
+      "default": "./dist/declaration-lines-generator.js"
+    },
+    "./codec-generator": {
+      "types": "./dist/codec-generator.d.ts",
+      "import": "./dist/codec-generator.js",
+      "default": "./dist/codec-generator.js"
+    },
+    "./contract-runtime-inline-generator": {
+      "types": "./dist/contract-runtime-inline-generator.d.ts",
+      "import": "./dist/contract-runtime-inline-generator.js",
+      "default": "./dist/contract-runtime-inline-generator.js"
+    },
+    "./endpoint-surface-generator": {
+      "types": "./dist/endpoint-surface-generator.d.ts",
+      "import": "./dist/endpoint-surface-generator.js",
+      "default": "./dist/endpoint-surface-generator.js"
+    },
+    "./openapi-surface-generator": {
+      "types": "./dist/openapi-surface-generator.d.ts",
+      "import": "./dist/openapi-surface-generator.js",
+      "default": "./dist/openapi-surface-generator.js"
+    },
+    "./http-route-generator": {
+      "types": "./dist/http-route-generator.d.ts",
+      "import": "./dist/http-route-generator.js",
+      "default": "./dist/http-route-generator.js"
+    },
+    "./docs": {
+      "types": "./dist/docs.d.ts",
+      "import": "./dist/docs.js",
+      "default": "./dist/docs.js"
+    },
+    "./docs-runtime": {
+      "types": "./dist/docs-runtime.d.ts",
+      "import": "./dist/docs-runtime.js",
+      "default": "./dist/docs-runtime.js"
+    },
+    "./openapi-types": {
+      "types": "./dist/openapi-types.d.ts",
+      "import": "./dist/openapi-types.js",
+      "default": "./dist/openapi-types.js"
+    },
+    "./scalar-html": {
+      "types": "./dist/scalar-html.d.ts",
+      "import": "./dist/scalar-html.js",
+      "default": "./dist/scalar-html.js"
+    },
+    "./openapi-generator": {
+      "types": "./dist/openapi-generator.d.ts",
+      "import": "./dist/openapi-generator.js",
+      "default": "./dist/openapi-generator.js"
+    },
+    "./generate-declaration-lines-cli": {
+      "types": "./dist/generate-declaration-lines-cli.d.ts",
+
+[TRUNCATED] Showing first 80 of 169 lines.
+
+=== ENTRY POINTS ===
+Found: src/index.ts
+
+=== LINTING AND FORMATTING CONFIG ===
+Found: tsconfig.json
+
+=== ENVIRONMENT VARIABLE TEMPLATES ===
+No .env.example or .env.template found. Identify required environment variables by searching the code and config for environment variable reads.
+
+=== TODO / FIXME / HACK (production code only, test dirs excluded) ===
+None found.
+
+=== GIT RECENT COMMITS (last 20) ===
+No commits found.
+
+=== HIGH-CHURN FILES (last 90 days, top 20) ===
+None found.
+
+=== MONOREPO SIGNALS ===
+No monorepo signals detected.
+
+=== CODE METRICS ===
+Total files scanned: 29
+Total lines of code: 5775
+
+Files by language:
+  TypeScript: 23
+  Other: 6
+
+Top 10 largest files:
+nogg-aholic-nrpc-cli-0.5.0.tgz: 66.8KB
+src\openapi-surface-generator.ts: 47.9KB
+src\codec-generator.ts: 45.1KB
+src\endpoint-surface-generator.ts: 17.2KB
+src\graphql-operation-analyzer.ts: 15.1KB
+src\structural-contract-generator.ts: 12.1KB
+src\openapi-generator.ts: 10.6KB
+src\generate-graphql-openapi-surface-cli.ts: 7.1KB
+src\contract-runtime-inline-generator.ts: 6.9KB
+src\graphql-openapi-generator.ts: 6.0KB
+
+=== CI/CD PIPELINES ===
+No CI/CD pipelines detected.
+
+=== CONTAINERS & ORCHESTRATION ===
+No containerization configs detected.
+
+=== SECURITY & COMPLIANCE ===
+No security configs detected.
+
+=== PERFORMANCE & TESTING ===
+No performance testing configs detected.
+
+=== SCAN COMPLETE ===

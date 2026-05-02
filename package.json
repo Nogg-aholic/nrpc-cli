@@ -1,0 +1,169 @@
+{
+  "name": "@nogg-aholic/nrpc-cli",
+  "description": "Code generation and CLI tooling for nRPC.",
+  "version": "0.5.0",
+  "homepage": "https://github.com/Nogg-aholic/nRPC#readme",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "nrpc-generate-declaration-lines": "dist/generate-declaration-lines-cli.js",
+    "nrpc-generate-codec": "dist/generate-codec-cli.js",
+    "nrpc-generate-endpoint-surface": "dist/generate-endpoint-surface-cli.js",
+    "nrpc-generate-endpoint-global-dts": "dist/generate-endpoint-global-dts-cli.js",
+    "nrpc-generate-openapi-surface": "dist/generate-openapi-surface-cli.js",
+    "nrpc-generate-graphql-openapi-surface": "dist/generate-graphql-openapi-surface-cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./declaration-lines-generator": {
+      "types": "./dist/declaration-lines-generator.d.ts",
+      "import": "./dist/declaration-lines-generator.js",
+      "default": "./dist/declaration-lines-generator.js"
+    },
+    "./codec-generator": {
+      "types": "./dist/codec-generator.d.ts",
+      "import": "./dist/codec-generator.js",
+      "default": "./dist/codec-generator.js"
+    },
+    "./contract-runtime-inline-generator": {
+      "types": "./dist/contract-runtime-inline-generator.d.ts",
+      "import": "./dist/contract-runtime-inline-generator.js",
+      "default": "./dist/contract-runtime-inline-generator.js"
+    },
+    "./endpoint-surface-generator": {
+      "types": "./dist/endpoint-surface-generator.d.ts",
+      "import": "./dist/endpoint-surface-generator.js",
+      "default": "./dist/endpoint-surface-generator.js"
+    },
+    "./openapi-surface-generator": {
+      "types": "./dist/openapi-surface-generator.d.ts",
+      "import": "./dist/openapi-surface-generator.js",
+      "default": "./dist/openapi-surface-generator.js"
+    },
+    "./http-route-generator": {
+      "types": "./dist/http-route-generator.d.ts",
+      "import": "./dist/http-route-generator.js",
+      "default": "./dist/http-route-generator.js"
+    },
+    "./docs": {
+      "types": "./dist/docs.d.ts",
+      "import": "./dist/docs.js",
+      "default": "./dist/docs.js"
+    },
+    "./docs-runtime": {
+      "types": "./dist/docs-runtime.d.ts",
+      "import": "./dist/docs-runtime.js",
+      "default": "./dist/docs-runtime.js"
+    },
+    "./openapi-types": {
+      "types": "./dist/openapi-types.d.ts",
+      "import": "./dist/openapi-types.js",
+      "default": "./dist/openapi-types.js"
+    },
+    "./scalar-html": {
+      "types": "./dist/scalar-html.d.ts",
+      "import": "./dist/scalar-html.js",
+      "default": "./dist/scalar-html.js"
+    },
+    "./openapi-generator": {
+      "types": "./dist/openapi-generator.d.ts",
+      "import": "./dist/openapi-generator.js",
+      "default": "./dist/openapi-generator.js"
+    },
+    "./generate-declaration-lines-cli": {
+      "types": "./dist/generate-declaration-lines-cli.d.ts",
+      "import": "./dist/generate-declaration-lines-cli.js"
+    },
+    "./generate-codec-cli": {
+      "types": "./dist/generate-codec-cli.d.ts",
+      "import": "./dist/generate-codec-cli.js"
+    },
+    "./generate-endpoint-surface-cli": {
+      "types": "./dist/generate-endpoint-surface-cli.d.ts",
+      "import": "./dist/generate-endpoint-surface-cli.js"
+    },
+    "./generate-openapi-surface-cli": {
+      "types": "./dist/generate-openapi-surface-cli.d.ts",
+      "import": "./dist/generate-openapi-surface-cli.js"
+    },
+    "./generate-graphql-openapi-surface-cli": {
+      "types": "./dist/generate-graphql-openapi-surface-cli.d.ts",
+      "import": "./dist/generate-graphql-openapi-surface-cli.js"
+    },
+    "./generate-endpoint-global-dts-cli": {
+      "types": "./dist/generate-endpoint-global-dts-cli.d.ts",
+      "import": "./dist/generate-endpoint-global-dts-cli.js"
+    },
+    "./structural-contract-generator": {
+      "types": "./dist/structural-contract-generator.d.ts",
+      "import": "./dist/structural-contract-generator.js",
+      "default": "./dist/structural-contract-generator.js"
+    },
+    "./graphql-operation-analyzer": {
+      "types": "./dist/graphql-operation-analyzer.d.ts",
+      "import": "./dist/graphql-operation-analyzer.js",
+      "default": "./dist/graphql-operation-analyzer.js"
+    },
+    "./graphql-openapi-generator": {
+      "types": "./dist/graphql-openapi-generator.d.ts",
+      "import": "./dist/graphql-openapi-generator.js",
+      "default": "./dist/graphql-openapi-generator.js"
+    },
+    "./graphql-postman-collection": {
+      "types": "./dist/graphql-postman-collection.d.ts",
+      "import": "./dist/graphql-postman-collection.js",
+      "default": "./dist/graphql-postman-collection.js"
+    }
+  },
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Nogg-aholic/nRPC"
+  },
+  "bugs": {
+    "url": "https://github.com/Nogg-aholic/nRPC/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/",
+    "provenance": true
+  },
+  "keywords": [
+    "rpc",
+    "codegen",
+    "openapi",
+    "graphql",
+    "typescript"
+  ],
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && bunx tsc -p ./tsconfig.json",
+    "prepack": "bun run build"
+  },
+  "peerDependencies": {
+    "@nogg-aholic/nrpc": "^0.5.0"
+  },
+  "peerDependenciesMeta": {
+    "@nogg-aholic/nrpc": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "graphql": "^16.11.0",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.3"
+  }
+}
