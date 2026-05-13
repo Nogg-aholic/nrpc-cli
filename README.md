@@ -2,9 +2,15 @@
 
 `@nogg-aholic/nrpc-cli` contains the code generation and CLI tooling for `@nogg-aholic/nrpc`.
 
-It is a separate package so runtime consumers do not need to install generation dependencies.
+It is maintained as a separate package so runtime consumers do not need to install generation dependencies.
+
+This package is the generator/tooling side only. Runtime behavior stays in `@nogg-aholic/nrpc`.
 
 ## Install
+
+For local repository development, use the package from this workspace.
+
+If you are consuming it as a published package, install it alongside `@nogg-aholic/nrpc`.
 
 `@nogg-aholic/nrpc-cli` expects `@nogg-aholic/nrpc` alongside it.
 
@@ -30,6 +36,8 @@ This package owns:
 - OpenAPI wrapper generation
 - GraphQL-to-OpenAPI surface generation
 - docs artifact generation helpers
+- package-target generation for curated surface fixtures
+- canonical NRPC surface manifest generation
 
 It does not duplicate runtime behavior. Runtime code stays in `@nogg-aholic/nrpc`.
 
@@ -43,6 +51,7 @@ Installed binaries:
 - `nrpc-generate-endpoint-global-dts`
 - `nrpc-generate-openapi-surface`
 - `nrpc-generate-graphql-openapi-surface`
+- `nrpc-generate-package-target`
 
 ## Examples
 
@@ -78,6 +87,60 @@ nrpc-generate-openapi-surface \
 	--root-type ThirdPartyApiSurface \
 	--root-path thirdParty
 ```
+
+Expected emitted artifact set:
+
+- `./src/generated/third-party-api.contract.ts`
+- `./src/generated/third-party-api.surface.docs.ts`
+- `./src/generated/third-party-api.mcp-tools.ts`
+
+### Generate A Package Target
+
+Package targets are repository-local generation configs stored in `packages/*/target.json` and are mainly used to produce curated fixtures such as `lib-es5`, `node`, `bun`, and `typescript`.
+
+```bash
+nrpc-generate-package-target --target lib-es5
+```
+
+Equivalent local script:
+
+```bash
+bun run generate:lib-es5
+```
+
+Expected emitted artifact set for a package target:
+
+- `generated/<target>/<target>.surface.manifest.json`
+- `generated/<target>/<target>.openapi.json`
+- `generated/<target>/<target>.contract.ts`
+- `generated/<target>/<target>.surface.docs.ts`
+- `generated/<target>/<target>.mcp-tools.ts`
+
+The same files are also mirrored into `../nodeTypes/<target>/` for local editor/runtime consumption.
+
+## Canonical Surface Manifest
+
+Package-target generation is manifest-first.
+
+The canonical file is:
+
+- `<target>.surface.manifest.json`
+
+It is the source of truth for:
+
+- method signature metadata
+- semantic/effect metadata
+- runtime shape metadata
+- transport bindings
+
+Current top-level structure:
+
+- `methods[]`: canonical NRPC surface entries
+- `bindings.http[]`: HTTP binding projection for those methods
+
+OpenAPI is now a derived transport/docs projection, not the canonical semantic source.
+
+For difficult ambient or host-provided types, the manifest may intentionally fall back to `unknown` runtime shapes while preserving method signature metadata so generation can complete.
 
 ### Generate From GraphQL Operations
 
@@ -121,6 +184,8 @@ Current repository layout relies on sibling-package development wiring, especial
 
 That keeps the split at two published packages without introducing parallel code paths.
 
+Repository-local package-target source folders under `packages/` are generation inputs and fixtures. They are not part of the public published surface of `@nogg-aholic/nrpc-cli`.
+
 ## Verification
 
 `nrpc-cli` does not currently keep an in-package unit or integration test harness.
@@ -130,5 +195,15 @@ Instead, verification is intentionally kept lightweight and repeatable:
 1. build the package
 2. run a smoke generation flow against repository fixtures
 3. confirm emitted artifacts land in the existing generated output locations without generator errors
+
+Typical local verification commands:
+
+```bash
+bun run build
+bun run generate:lib-es5
+bun run generate:node
+bun run generate:bun
+bun run generate:typescript
+```
 
 See `docs/codebase/VERIFICATION.md` for the repeatable local flow.
