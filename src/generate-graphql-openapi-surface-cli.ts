@@ -7,9 +7,9 @@ import {
   type IntrospectionQuery,
 } from 'graphql';
 
-import { analyzeGraphqlOperations } from './graphql-operation-analyzer.js';
-import { generateGraphqlOpenApi } from './graphql-openapi-generator.js';
-import { extractGraphqlOperationsFromPostmanCollection } from './graphql-postman-collection.js';
+import { analyzeGraphqlOperations } from './graphql/operation-analyzer.js';
+import { generateGraphqlOpenApi } from './graphql/openapi-generator.js';
+import { extractGraphqlOperationsFromPostmanCollection } from './graphql/postman-collection.js';
 import { generateOpenApiSurface } from './openapi-surface-generator.js';
 
 type GraphqlIntrospectionEnvelope = {

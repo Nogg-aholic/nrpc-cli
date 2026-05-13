@@ -6,7 +6,7 @@
 
 | Severity | Concern | Evidence | Impact | Suggested action |
 |----------|---------|----------|--------|------------------|
-| high | No automated test setup is configured in this package | package.json; docs/codebase/.codebase-scan.txt | Generator regressions may only surface after consumers use emitted artifacts | Add a repeatable test/smoke command around representative fixtures and expected generated outputs |
+| medium | No in-package unit/integration test harness is configured; verification currently relies on documented smoke flows | package.json; docs/codebase/.codebase-scan.txt; README.md; docs/codebase/VERIFICATION.md | Fine-grained regressions may surface later than they would with fixture assertions, but core CLI behavior is still checkable before publish | Keep the smoke verification flow current and add fixture assertions only when churn or failures justify the maintenance cost |
 | high | Core generators are large single files | docs/codebase/.codebase-scan.txt; src/openapi-surface-generator.ts; src/codec-generator.ts | Changes in one area can unintentionally affect multiple output formats | Split large generators into smaller parsing/rendering modules with focused tests |
 | medium | Development build depends on sibling-path tsconfig aliasing into `../nRPC` | tsconfig.json | Package isolation is weaker; standalone local builds depend on repository layout | Add a documented isolated build path or validate the sibling dependency assumption in CI |
 | medium | Error handling is mostly exception-based with minimal structured diagnostics | src/generate-codec-cli.ts; src/generate-openapi-surface-cli.ts; src/generate-graphql-openapi-surface-cli.ts | CLI failures may be harder to troubleshoot in automation | Emit clearer error context and optional verbose diagnostics |
@@ -18,9 +18,10 @@ List the most important debt items only.
 
 | Debt item | Why it exists | Where | Risk if ignored | Suggested fix |
 |-----------|---------------|-------|-----------------|---------------|
+| Verification is documentation-driven instead of test-runner-driven | The package is kept dependency-light and primarily validated through build + smoke generation against repository fixtures | package.json; README.md; docs/codebase/VERIFICATION.md | Verification can drift if fixture paths or commands change without docs updates | Keep one canonical verification doc and validate it whenever CLI/package docs change |
 | Monolithic OpenAPI surface generator | One module currently handles parsing, naming, schema projection, docs rendering, and MCP tool text generation | src/openapi-surface-generator.ts | Refactors become high-risk and harder to review | Extract parsers, naming policy, and emitters into separate modules |
 | Monolithic codec/type normalizer | TypeScript program setup, type normalization, and codec-shape logic are centralized | src/codec-generator.ts | New type-shape support may regress existing normalization behavior | Separate compiler-host concerns from shape normalization and rendering helpers |
-| Packed tarball committed in root | Distribution artifact is present alongside source | docs/codebase/.codebase-scan.txt | Source review noise and possible stale artifact drift | [ASK USER] Should packed artifacts stay committed in this package root? |
+| Packed tarball committed in root | Distribution artifact is present alongside source | docs/codebase/.codebase-scan.txt | Source review noise and possible stale artifact drift | Keep only if it is part of the intended release workflow; otherwise remove it from normal source review paths |
 
 ### 3) Security Concerns
 

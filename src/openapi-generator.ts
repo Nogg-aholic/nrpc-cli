@@ -1,16 +1,15 @@
 import type * as ts from "typescript";
 import {
-	collectRpcMethods,
-	createProgram,
-	defaultPolicies,
-	getTypeFromExportedAlias,
 	normalizeType,
 	type CodecPolicies,
+	type CollectedRpcMethod,
+	type SurfaceTraversalOptions,
 	type TypeNodeShape,
 	type VirtualProgramSource,
+	visitRpcMethods,
 	unwrapPromiseLikeType,
 } from "./codec-generator.js";
-import { generateHttpRouteManifest } from "./http-route-generator.js";
+import { analyzeRpcSurface, createRpcAnalysisScaffold, generateHttpRouteManifest, type RpcAnalysisScaffold } from "./http-route-generator.js";
 import { renderScalarHtml, type RenderScalarHtmlOptions } from "./scalar-html.js";
 import type { OpenApiDocument, OpenApiMethodDocs, OpenApiMethodProjection, OpenApiSchema } from "./openapi-types.js";
 
@@ -25,6 +24,7 @@ export type GenerateOpenApiDocumentOptions = {
 	policies?: CodecPolicies;
 	docs?: Record<string, OpenApiMethodDocs>;
 	virtualSources?: readonly VirtualProgramSource[];
+	traversal?: SurfaceTraversalOptions;
 };
 
 export type GenerateOpenApiArtifactsOptions = GenerateOpenApiDocumentOptions & {
@@ -36,6 +36,14 @@ export type GeneratedOpenApiArtifacts = {
 	html: string;
 	projections: OpenApiMethodProjection[];
 };
+
+export type OpenApiDocumentShard = {
+	shardKey: string;
+	document: OpenApiDocument;
+	projections: OpenApiMethodProjection[];
+};
+
+export type OpenApiProjectionVisitor = (projection: OpenApiMethodProjection) => void;
 
 export function generateOpenApiDocument(options: GenerateOpenApiDocumentOptions): OpenApiDocument {
 	return buildOpenApiDocumentFromProjections(generateOpenApiMethodProjections(options), options);
@@ -66,57 +74,49 @@ export function buildOpenApiMethodDocument(
 }
 
 export function generateOpenApiMethodProjections(options: GenerateOpenApiDocumentOptions): OpenApiMethodProjection[] {
-	const policies = defaultPolicies(options.policies);
-	const program = createProgram({
-		entryFile: options.entryFile,
-		virtualSources: options.virtualSources,
+	const analysis = analyzeRpcSurface(options);
+	return buildMethodProjections(analysis, options).sort((left, right) => left.methodName.localeCompare(right.methodName));
+}
+
+export function generateOpenApiDocumentShards(
+	options: GenerateOpenApiDocumentOptions,
+	groupBy: (projection: OpenApiMethodProjection) => string = inferNamespaceShardKey,
+): OpenApiDocumentShard[] {
+	const analysis = analyzeRpcSurface(options);
+	const projections = buildMethodProjections(analysis, options).sort((left, right) => left.methodName.localeCompare(right.methodName));
+	const shards = new Map<string, OpenApiMethodProjection[]>();
+
+	for (const projection of projections) {
+		const shardKey = groupBy(projection);
+		const bucket = shards.get(shardKey) ?? [];
+		bucket.push(projection);
+		shards.set(shardKey, bucket);
+	}
+
+	return [...shards.entries()]
+		.sort((left, right) => left[0].localeCompare(right[0]))
+		.map(([shardKey, shardProjections]) => ({
+			shardKey,
+			projections: shardProjections,
+			document: buildOpenApiDocumentFromProjections(shardProjections, {
+				...options,
+				title: options.title ? `${options.title} (${shardKey})` : `${options.rootType} API (${shardKey})`,
+			}),
+		}));
+}
+
+export function visitOpenApiMethodProjections(
+	options: GenerateOpenApiDocumentOptions,
+	visitor: OpenApiProjectionVisitor,
+): void {
+	const scaffold = createRpcAnalysisScaffold(options);
+	visitRpcMethods(scaffold.rootType, scaffold.checker, scaffold.policies, (method) => {
+		visitor(buildMethodProjectionFromMethod(method, scaffold, options));
+	}, [], {
+		allowedSourceFiles: options.traversal?.allowedSourceFiles,
+		propertyValueTraversal: options.traversal?.propertyValueTraversal,
+		skipMethodPrefixes: options.traversal?.skipMethodPrefixes,
 	});
-	const checker = program.getTypeChecker();
-	const sourceFile = program.getSourceFile(options.entryFile);
-	if (!sourceFile) throw new Error(`Could not load source file ${options.entryFile}`);
-
-	const rootType = getTypeFromExportedAlias(sourceFile, checker, options.rootType);
-	const methods = collectRpcMethods(rootType, checker, policies);
-	const manifest = generateHttpRouteManifest({
-		entryFile: options.entryFile,
-		rootType: options.rootType,
-		rootPath: options.rootPath,
-		basePath: options.basePath,
-		protocolMode: "both",
-		policies: options.policies,
-		virtualSources: options.virtualSources,
-	});
-	const routeByMethod = new Map(manifest.routes.map((route) => [route.methodName, route]));
-
-	return methods.map((method) => {
-		const route = routeByMethod.get(method.methodName);
-		if (!route) throw new Error(`No HTTP route found for method ${method.methodName}`);
-
-		const components = new Map<string, OpenApiSchema>();
-		const requestShape = method.argsShape.kind === "tuple"
-			? tupleToRequestObjectShape(method.parameterNames, method.argsShape)
-			: method.argsShape;
-		const requestSchema = typeShapeToOpenApiSchema(requestShape, checker, components, policies);
-		const responseSchema = typeShapeToOpenApiSchema(
-			normalizeType(unwrapPromiseLikeType(method.resultType, checker), checker, policies),
-			checker,
-			components,
-			policies,
-		);
-		const docs = options.docs?.[method.methodName];
-
-		applyParamDescriptions(requestSchema, docs?.params);
-
-		return {
-			methodName: method.methodName,
-			httpPath: route.httpPath,
-			requestSchema,
-			responseSchema,
-			requestRequired: method.argsShape.kind === "tuple" && method.argsShape.elements.some((shape) => !isOptionalShape(shape)),
-			...(components.size > 0 ? { components: { schemas: Object.fromEntries(components) } } : {}),
-			...(docs ? { docs } : {}),
-		};
-	}).sort((left, right) => left.methodName.localeCompare(right.methodName));
 }
 
 export function buildOpenApiDocumentFromProjections(
@@ -245,22 +245,45 @@ function typeShapeToOpenApiSchema(
 				items: shape.elements.length > 0 ? { anyOf: shape.elements.map((entry) => typeShapeToOpenApiSchema(entry, checker, components, policies)) } : {},
 			};
 		case "object": {
-			const properties = Object.fromEntries(shape.properties.map((property) => {
-				const propertySchema = typeShapeToOpenApiSchema(property.shape, checker, components, policies);
-				if (property.description && !propertySchema.description) {
-					propertySchema.description = property.description;
+			if (shape.schemaId) {
+				const componentKey = shape.schemaName ? `${shape.schemaName}_${shape.schemaId}` : shape.schemaId;
+				const existing = components.get(componentKey);
+				if (existing) {
+					return { $ref: `#/components/schemas/${componentKey}` };
 				}
-				return [property.name, propertySchema] as const;
-			}));
-			const required = shape.properties.filter((property) => !isOptionalShape(property.shape)).map((property) => property.name);
-			return {
-				type: "object",
-				...(Object.keys(properties).length > 0 ? { properties } : {}),
-				...(required.length > 0 ? { required } : {}),
-			};
+
+				// Seed before descending so self-references and repeated graph nodes resolve via $ref.
+				components.set(componentKey, {});
+				const objectSchema = buildInlineObjectSchema(shape, checker, components, policies);
+				components.set(componentKey, objectSchema);
+				return { $ref: `#/components/schemas/${componentKey}` };
+			}
+
+			return buildInlineObjectSchema(shape, checker, components, policies);
 		}
 	}
 	return {};
+}
+
+function buildInlineObjectSchema(
+	shape: Extract<TypeNodeShape, { kind: "object" }>,
+	checker: ts.TypeChecker,
+	components: Map<string, OpenApiSchema>,
+	policies: Required<CodecPolicies>,
+): OpenApiSchema {
+	const properties = Object.fromEntries(shape.properties.map((property) => {
+		const propertySchema = typeShapeToOpenApiSchema(property.shape, checker, components, policies);
+		if (property.description && !propertySchema.description) {
+			propertySchema.description = property.description;
+		}
+		return [property.name, propertySchema] as const;
+	}));
+	const required = shape.properties.filter((property) => !isOptionalShape(property.shape)).map((property) => property.name);
+	return {
+		type: "object",
+		...(Object.keys(properties).length > 0 ? { properties } : {}),
+		...(required.length > 0 ? { required } : {}),
+	};
 }
 
 function isOptionalShape(shape: TypeNodeShape): boolean {
@@ -285,6 +308,103 @@ function inferTags(methodName: string): string[] {
 	return parts.length > 1 ? [parts.slice(0, -1).join(".")] : [];
 }
 
+function inferNamespaceShardKey(projection: OpenApiMethodProjection): string {
+	const parts = projection.methodName.split(".");
+	if (parts.length <= 1) {
+		return parts[0] ?? "root";
+	}
+
+	return parts.join(".");
+}
+
+export function getOpenApiProjectionShardKey(projection: OpenApiMethodProjection): string {
+	return inferNamespaceShardKey(projection);
+}
+
 function mergeComponents(projections: readonly OpenApiMethodProjection[]): Record<string, OpenApiSchema> {
-	return Object.assign({}, ...projections.map((projection) => projection.components?.schemas ?? {}));
+	const merged: Record<string, OpenApiSchema> = {};
+	for (const projection of projections) {
+		const schemas = projection.components?.schemas;
+		if (!schemas) {
+			continue;
+		}
+		for (const [key, schema] of Object.entries(schemas)) {
+			merged[key] = schema;
+		}
+	}
+	return merged;
+}
+
+function buildMethodProjections(
+	analysis: ReturnType<typeof analyzeRpcSurface>,
+	options: GenerateOpenApiDocumentOptions,
+): OpenApiMethodProjection[] {
+	const projections: OpenApiMethodProjection[] = [];
+
+	for (const method of analysis.methods) {
+		projections.push(buildMethodProjectionFromMethod(method, analysis, options));
+	}
+
+	return projections;
+}
+
+function buildMethodProjectionFromMethod(
+	method: CollectedRpcMethod,
+	analysis: RpcAnalysisScaffold,
+	options: GenerateOpenApiDocumentOptions,
+): OpenApiMethodProjection {
+	const route = buildGeneratedRoute(method, analysis.rootPath, options.basePath);
+	const components = new Map<string, OpenApiSchema>();
+	const requestShape = method.argsShape.kind === "tuple"
+		? tupleToRequestObjectShape(method.parameterNames, method.argsShape)
+		: method.argsShape;
+	const requestSchema = typeShapeToOpenApiSchema(requestShape, analysis.checker, components, analysis.policies);
+	const responseSchema = typeShapeToOpenApiSchema(
+		normalizeType(unwrapPromiseLikeType(method.resultType, analysis.checker), analysis.checker, analysis.policies),
+		analysis.checker,
+		components,
+		analysis.policies,
+	);
+	const docs = options.docs?.[method.methodName];
+
+	applyParamDescriptions(requestSchema, docs?.params);
+
+	return {
+		methodName: method.methodName,
+		httpPath: route.httpPath,
+		requestSchema,
+		responseSchema,
+		requestRequired: method.argsShape.kind === "tuple" && method.argsShape.elements.some((shape) => !isOptionalShape(shape)),
+		effects: method.effects,
+		genericTypeParameters: [...method.genericTypeParameters],
+		parameterNames: [...method.parameterNames],
+		parameterOptionalFlags: [...method.parameterOptionalFlags],
+		parameterRestFlags: [...method.parameterRestFlags],
+		parameterTypeTexts: [...method.parameterTypeTexts],
+		resultTypeText: method.resultTypeText,
+		symbolSemanticFlags: method.symbolSemanticFlags,
+		symbolRelations: method.symbolRelations,
+		memberAbiFlags: method.memberAbiFlags,
+		nodeAbiFlags: method.nodeAbiFlags,
+		...(components.size > 0 ? { components: { schemas: Object.fromEntries(components) } } : {}),
+		...(docs ? { docs } : {}),
+	};
+}
+
+function buildGeneratedRoute(method: CollectedRpcMethod, rootPath: string[], basePath: string | undefined): { httpPath: string } {
+	const normalizedBasePath = normalizeOpenApiBasePath(basePath ?? "/");
+	const trimmedMethodPath = rootPath.length > 0 && method.path[0] === rootPath[rootPath.length - 1]
+		? method.path.slice(1)
+		: method.path;
+	const pathParts = [...rootPath, ...trimmedMethodPath];
+	return {
+		httpPath: `${normalizedBasePath}/${pathParts.join("/")}`.replace(/\/+/g, "/"),
+	};
+}
+
+function normalizeOpenApiBasePath(value: string): string {
+	const normalized = value.replace(/\\/g, "/").trim();
+	if (!normalized || normalized === "/") return "";
+	const withLeadingSlash = normalized.startsWith("/") ? normalized : `/${normalized}`;
+	return withLeadingSlash.endsWith("/") ? withLeadingSlash.slice(0, -1) : withLeadingSlash;
 }

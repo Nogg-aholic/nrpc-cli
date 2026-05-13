@@ -1,6 +1,19 @@
-import type { CodecPolicies, VirtualProgramSource } from "./codec-generator.js";
+import type { CodecPolicies, SurfaceTraversalOptions, VirtualProgramSource } from "./codec-generator.js";
 import { camelize, collectRpcMethods, createProgram, defaultPolicies, getTypeFromExportedAlias } from "./codec-generator.js";
 import type { HttpProtocolMode, HttpRouteManifest, HttpRouteManifestEntry } from "@nogg-aholic/nrpc/http-route-runtime";
+
+export type RpcAnalysisScaffold = {
+	policies: Required<CodecPolicies>;
+	program: ReturnType<typeof createProgram>;
+	checker: ReturnType<ReturnType<typeof createProgram>["getTypeChecker"]>;
+	sourceFile: NonNullable<ReturnType<ReturnType<typeof createProgram>["getSourceFile"]>>;
+	rootType: ReturnType<typeof getTypeFromExportedAlias>;
+	rootPath: string[];
+};
+
+export type RpcAnalysisContext = RpcAnalysisScaffold & {
+	methods: ReturnType<typeof collectRpcMethods>;
+};
 
 export type GenerateHttpRouteManifestOptions = {
 	entryFile: string;
@@ -10,13 +23,16 @@ export type GenerateHttpRouteManifestOptions = {
 	protocolMode?: HttpProtocolMode;
 	policies?: CodecPolicies;
 	virtualSources?: readonly VirtualProgramSource[];
+	traversal?: SurfaceTraversalOptions;
 };
 
 export type GeneratedHttpRouteManifestEntry = HttpRouteManifestEntry;
 
 export type GeneratedHttpRouteManifest = HttpRouteManifest;
 
-export function generateHttpRouteManifest(options: GenerateHttpRouteManifestOptions): GeneratedHttpRouteManifest {
+export function createRpcAnalysisScaffold(
+	options: Pick<GenerateHttpRouteManifestOptions, "entryFile" | "rootType" | "rootPath" | "policies" | "virtualSources">,
+): RpcAnalysisScaffold {
 	const policies = defaultPolicies(options.policies);
 	const program = createProgram({
 		entryFile: options.entryFile,
@@ -27,20 +43,48 @@ export function generateHttpRouteManifest(options: GenerateHttpRouteManifestOpti
 	if (!sourceFile) throw new Error(`Could not load source file ${options.entryFile}`);
 	const rootType = getTypeFromExportedAlias(sourceFile, checker, options.rootType);
 	const rootPath = options.rootPath ?? [camelize(options.rootType)];
-	const basePath = normalizeBasePath(options.basePath ?? "/");
-	const protocolMode = options.protocolMode ?? "binary";
-	const methods = collectRpcMethods(rootType, checker, policies);
 
 	return {
-		id: rootPath[rootPath.length - 1] ?? camelize(options.rootType),
+		policies,
+		program,
+		checker,
+		sourceFile,
+		rootType,
 		rootPath,
+	};
+}
+
+export function analyzeRpcSurface(
+	options: Pick<GenerateHttpRouteManifestOptions, "entryFile" | "rootType" | "rootPath" | "policies" | "virtualSources" | "traversal">,
+): RpcAnalysisContext {
+	const scaffold = createRpcAnalysisScaffold(options);
+	const methods = collectRpcMethods(scaffold.rootType, scaffold.checker, scaffold.policies, [], {
+		allowedSourceFiles: options.traversal?.allowedSourceFiles,
+		propertyValueTraversal: options.traversal?.propertyValueTraversal,
+		skipMethodPrefixes: options.traversal?.skipMethodPrefixes,
+	});
+
+	return {
+		...scaffold,
+		methods,
+	};
+}
+
+export function generateHttpRouteManifest(options: GenerateHttpRouteManifestOptions): GeneratedHttpRouteManifest {
+	const analysis = analyzeRpcSurface(options);
+	const basePath = normalizeBasePath(options.basePath ?? "/");
+	const protocolMode = options.protocolMode ?? "binary";
+
+	return {
+		id: analysis.rootPath[analysis.rootPath.length - 1] ?? camelize(options.rootType),
+		rootPath: analysis.rootPath,
 		basePath,
 		protocolMode,
-		routes: methods.map((method) => {
-			const trimmedMethodPath = rootPath.length > 0 && method.path[0] === rootPath[rootPath.length - 1]
+		routes: analysis.methods.map((method) => {
+			const trimmedMethodPath = analysis.rootPath.length > 0 && method.path[0] === analysis.rootPath[analysis.rootPath.length - 1]
 				? method.path.slice(1)
 				: method.path;
-			const pathParts = [...rootPath, ...trimmedMethodPath];
+			const pathParts = [...analysis.rootPath, ...trimmedMethodPath];
 			const rootAccessor = method.path.reduce((expression, part) => `${expression}[${JSON.stringify(part)}]`, options.rootType);
 			return {
 				methodName: method.methodName,

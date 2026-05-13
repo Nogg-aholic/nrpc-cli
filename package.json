@@ -11,7 +11,8 @@
     "nrpc-generate-endpoint-surface": "dist/generate-endpoint-surface-cli.js",
     "nrpc-generate-endpoint-global-dts": "dist/generate-endpoint-global-dts-cli.js",
     "nrpc-generate-openapi-surface": "dist/generate-openapi-surface-cli.js",
-    "nrpc-generate-graphql-openapi-surface": "dist/generate-graphql-openapi-surface-cli.js"
+    "nrpc-generate-graphql-openapi-surface": "dist/generate-graphql-openapi-surface-cli.js",
+    "nrpc-generate-package-target": "dist/generate-package-target-cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -40,6 +41,11 @@
       "types": "./dist/endpoint-surface-generator.d.ts",
       "import": "./dist/endpoint-surface-generator.js",
       "default": "./dist/endpoint-surface-generator.js"
+    },
+    "./package-target-generator": {
+      "types": "./dist/package-target-generator.d.ts",
+      "import": "./dist/package-target-generator.js",
+      "default": "./dist/package-target-generator.js"
     },
     "./openapi-surface-generator": {
       "types": "./dist/openapi-surface-generator.d.ts",
@@ -92,6 +98,10 @@
       "types": "./dist/generate-openapi-surface-cli.d.ts",
       "import": "./dist/generate-openapi-surface-cli.js"
     },
+    "./generate-package-target-cli": {
+      "types": "./dist/generate-package-target-cli.d.ts",
+      "import": "./dist/generate-package-target-cli.js"
+    },
     "./generate-graphql-openapi-surface-cli": {
       "types": "./dist/generate-graphql-openapi-surface-cli.d.ts",
       "import": "./dist/generate-graphql-openapi-surface-cli.js"
@@ -129,11 +139,6 @@
   "bugs": {
     "url": "https://github.com/Nogg-aholic/nRPC/issues"
   },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/",
-    "provenance": true
-  },
   "keywords": [
     "rpc",
     "codegen",
@@ -142,15 +147,22 @@
     "typescript"
   ],
   "files": [
-    "dist"
+    "dist",
+    "packages/**/*.json"
   ],
   "scripts": {
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "npm run clean && bunx tsc -p ./tsconfig.json",
+    "test": "bun test",
+    "generate:package-target": "bun run ./src/generate-package-target-cli.ts",
+    "generate:lib-es5": "bun run ./src/generate-package-target-cli.ts --target lib-es5",
+    "generate:node": "bun run ./src/generate-package-target-cli.ts --target node",
+    "generate:bun": "bun run ./src/generate-package-target-cli.ts --target bun",
+    "generate:typescript": "bun run ./src/generate-package-target-cli.ts --target typescript",
     "prepack": "bun run build"
   },
   "peerDependencies": {
-    "@nogg-aholic/nrpc": "^0.5.0"
+    "@nogg-aholic/nrpc": "^0.4.7"
   },
   "peerDependenciesMeta": {
     "@nogg-aholic/nrpc": {

@@ -65,12 +65,100 @@ export type OpenApiMethodDocs = {
 	tags?: string[];
 };
 
+export type OpenApiMethodEffects = {
+	receiverMutability: "none" | "immutable" | "mutable";
+	mutatesReceiver: boolean;
+	externalSideEffects: boolean;
+	executionPurity: "pure" | "impure" | "unknown";
+	reason: string;
+};
+
+export type OpenApiMemberAbiFlags = {
+	static: boolean;
+	async: boolean;
+	readonly: boolean;
+	abstract: boolean;
+	visibility: "public" | "protected" | "private";
+	override: boolean;
+	deprecated: boolean;
+	export: boolean;
+};
+
+export type OpenApiNodeAbiFlags = {
+	containsThis: boolean;
+	hasAsyncFunctions: boolean;
+	awaitContext: boolean;
+	optionalChain: boolean;
+	hasImplicitReturn: boolean;
+	hasExplicitReturn: boolean;
+};
+
+export type OpenApiSymbolSpace = "value" | "type" | "namespace";
+
+export type OpenApiSymbolKind =
+	| "unknown"
+	| "function"
+	| "method"
+	| "property"
+	| "accessor"
+	| "constructor"
+	| "class"
+	| "interface"
+	| "typeAlias"
+	| "typeParameter"
+	| "enum"
+	| "enumMember"
+	| "module"
+	| "namespace"
+	| "signature"
+	| "alias"
+	| "prototype"
+	| "objectLiteral"
+	| "typeLiteral";
+
+export type OpenApiRelationTargetRef = {
+	name: string;
+	path?: string[];
+};
+
+export type OpenApiSymbolRelationSet = {
+	aliasOf?: OpenApiRelationTargetRef;
+	instantiatedFrom?: OpenApiRelationTargetRef;
+	extends?: OpenApiRelationTargetRef[];
+	implements?: OpenApiRelationTargetRef[];
+	memberOf?: OpenApiRelationTargetRef;
+	declaresTypeParameters?: string[];
+	constrainedBy?: OpenApiRelationTargetRef[];
+};
+
+export type OpenApiSymbolSemanticFlags = {
+	symbolKind: OpenApiSymbolKind;
+	spaces: OpenApiSymbolSpace[];
+	isAlias: boolean;
+	isOptional: boolean;
+	isTypeOnly: boolean;
+	isValueLike: boolean;
+	isTypeLike: boolean;
+	isNamespaceLike: boolean;
+};
+
 export type OpenApiMethodProjection = {
 	methodName: string;
 	httpPath: string;
 	requestSchema: OpenApiSchema;
 	responseSchema: OpenApiSchema;
 	requestRequired: boolean;
+	effects: OpenApiMethodEffects;
+	memberAbiFlags: OpenApiMemberAbiFlags;
+	nodeAbiFlags: OpenApiNodeAbiFlags;
+	genericTypeParameters: string[];
+	parameterNames: string[];
+	parameterOptionalFlags: boolean[];
+	parameterRestFlags: boolean[];
+	parameterTypeTexts: string[];
+	resultTypeText: string;
+	symbolSemanticFlags: OpenApiSymbolSemanticFlags;
+	symbolRelations: OpenApiSymbolRelationSet;
 	components?: {
 		schemas: Record<string, OpenApiSchema>;
 	};

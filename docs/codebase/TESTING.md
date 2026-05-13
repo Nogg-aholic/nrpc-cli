@@ -4,47 +4,46 @@
 
 ### 1) Test Stack and Commands
 
-- Primary test framework: [TODO] none configured in package manifest
-- Assertion/mocking tools: [TODO]
+- Primary test framework: none configured in package manifest
+- Assertion/mocking tools: none configured in package manifest
 - Commands:
 
 ```bash
-[TODO] no test command configured
-[TODO] no unit test command configured
-[TODO] no integration/e2e test command configured
-[TODO] no coverage command configured
+npm run build
+# then follow docs/codebase/VERIFICATION.md for repository-fixture smoke checks
 ```
 
 ### 2) Test Layout
 
-- Test file placement pattern: [TODO] no test files were found in this package scan
-- Naming convention: [TODO]
-- Setup files and where they run: [TODO]
+- Test file placement pattern: no local test files are currently configured in this package
+- Naming convention: none yet
+- Setup files and where they run: none
 
 ### 3) Test Scope Matrix
 
 | Scope | Covered? | Typical target | Notes |
 |-------|----------|----------------|-------|
-| Unit | [TODO] | [TODO] | No test files detected under `nrpc-cli` |
-| Integration | [TODO] | [TODO] | Neighboring packages and generated artifacts exist in the repository, but this package itself has no test config or local tests in the scan |
-| E2E | [TODO] | [TODO] | [TODO] |
+| Unit | No | N/A | No test files detected under `nrpc-cli` |
+| Integration | Partial | CLI build plus repository-fixture smoke generation | Verification is documented rather than wired to a local test runner |
+| E2E | No | N/A | No end-to-end harness is configured in this package |
 
 ### 4) Mocking and Isolation Strategy
 
-- Main mocking approach: [TODO]
-- Isolation guarantees: [TODO]
-- Common failure mode in tests: [TODO]
+- Main mocking approach: none
+- Isolation guarantees: smoke flow writes to existing generated artifact locations already used by the repo
+- Common failure mode in tests: command or fixture-path drift would break the documented smoke flow
 
 ### 5) Coverage and Quality Signals
 
-- Coverage tool + threshold: [TODO]
-- Current reported coverage: [TODO]
-- Known gaps/flaky areas: no in-package automated test coverage was detected by the scan; generated output correctness appears to rely on examples/manual smoke flows in neighboring packages and samples
+- Coverage tool + threshold: none configured
+- Current reported coverage: none
+- Known gaps/flaky areas: no in-package automated test coverage is configured; confidence comes from repeatable build plus fixture-backed smoke generation documented in `VERIFICATION.md`
 
 ### 6) Evidence
 
 - package.json
 - docs/codebase/.codebase-scan.txt
 - README.md
-- ../rpc-api-example/src/generate.ts
+- docs/codebase/VERIFICATION.md
+- ../nrpc-api-example/src/generate.ts
 - ../nRPC/samples/graphql-smoke/railway_graphql_collection.json

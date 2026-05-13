@@ -1,18 +1,13 @@
 import path from "node:path";
 import * as ts from "typescript";
 import {
-	camelize,
-	collectRpcMethods,
-	createProgram,
-	defaultPolicies,
-	getTypeFromExportedAlias,
 	normalizeType,
 	type TypeNodeShape,
 	type VirtualProgramSource,
 	unwrapPromiseLikeType,
 	type CodecPolicies
 } from "./codec-generator.js";
-import { generateHttpRouteManifest } from "./http-route-generator.js";
+import { analyzeRpcSurface, generateHttpRouteManifest, type RpcAnalysisContext } from "./http-route-generator.js";
 
 export type GenerateEndpointSurfaceOptions = {
 	entryFile: string;
@@ -42,22 +37,12 @@ export type GenerateEndpointGlobalDeclarationOptions = {
 };
 
 export function generateEndpointSurface(options: GenerateEndpointSurfaceOptions): GeneratedEndpointSurfaceResult {
-	const policies = defaultPolicies(options.policies);
-	const program = createProgram({
-		entryFile: options.entryFile,
-		virtualSources: options.virtualSources,
-	});
-	const checker = program.getTypeChecker();
-	const sourceFile = program.getSourceFile(options.entryFile);
-	if (!sourceFile) throw new Error(`Could not load source file ${options.entryFile}`);
-	const rootType = getTypeFromExportedAlias(sourceFile, checker, options.rootType);
-	const rootPath = options.rootPath ?? [camelize(options.rootType)];
-	const globalName = options.globalName ?? rootPath[rootPath.length - 1] ?? camelize(options.rootType);
-	const methods = collectRpcMethods(rootType, checker, policies);
+	const analysis = analyzeRpcSurface(options);
+	const globalName = options.globalName ?? analysis.rootPath[analysis.rootPath.length - 1] ?? analysis.rootPath[0] ?? options.rootType;
 	const routeManifest = generateHttpRouteManifest({
 		entryFile: options.entryFile,
 		rootType: options.rootType,
-		rootPath,
+		rootPath: analysis.rootPath,
 		basePath: "/",
 		protocolMode: "both",
 		policies: options.policies,
@@ -65,14 +50,14 @@ export function generateEndpointSurface(options: GenerateEndpointSurfaceOptions)
 	});
 	const contractText = renderGeneratedContractModule({
 		rootType: options.rootType,
-		rootPath,
+		rootPath: analysis.rootPath,
 		globalName,
 		moduleSpecifier: options.moduleSpecifier,
 		runtimeImportPath: options.runtimeImportPath,
 		routeManifest,
-		checker,
-		policies,
-		methods,
+		checker: analysis.checker,
+		policies: analysis.policies,
+		methods: analysis.methods,
 	});
 	return {
 		contractText,
@@ -88,7 +73,7 @@ type RenderGeneratedContractModuleOptions = {
 	routeManifest: ReturnType<typeof generateHttpRouteManifest>;
 	checker: ts.TypeChecker;
 	policies: Required<CodecPolicies>;
-	methods: ReturnType<typeof collectRpcMethods>;
+	methods: RpcAnalysisContext["methods"];
 };
 
 function renderGeneratedContractModule(options: RenderGeneratedContractModuleOptions): string {
@@ -148,7 +133,7 @@ function stripRouteManifestTypeRefs(manifest: ReturnType<typeof generateHttpRout
 }
 
 function renderRpcMethodLiteral(
-	method: ReturnType<typeof collectRpcMethods>[number],
+	method: RpcAnalysisContext["methods"][number],
 	checker: ts.TypeChecker,
 	policies: Required<CodecPolicies>,
 ): { argsTupleType: string; resultType: string; methodGenericArgs: string } {
@@ -320,16 +305,8 @@ function renderGeneratedMethodIdentifier(methodName: string): string {
 }
 
 export function generateEndpointGlobalDeclaration(options: GenerateEndpointGlobalDeclarationOptions): string {
-	const policies = defaultPolicies(options.policies);
-	const program = createProgram({
-		entryFile: options.entryFile,
-		virtualSources: options.virtualSources,
-	});
-	const checker = program.getTypeChecker();
-	const sourceFile = program.getSourceFile(options.entryFile);
-	if (!sourceFile) throw new Error(`Could not load source file ${options.entryFile}`);
-	const rootType = getTypeFromExportedAlias(sourceFile, checker, options.rootType);
-	const aliasBody = renderRpcApiTypeLiteral(rootType, checker, policies, 0);
+	const analysis = analyzeRpcSurface(options);
+	const aliasBody = renderRpcApiTypeLiteral(analysis.rootType, analysis.checker, analysis.policies, 0);
 	return [
 		`type ${options.declarationTypeName} = ${aliasBody};`,
 		"",

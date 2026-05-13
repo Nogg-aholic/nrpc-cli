@@ -17,6 +17,7 @@ export type GeneratedDocsRuntimeArtifacts = {
 		requestSchema: unknown;
 		responseSchema: unknown;
 		requestRequired: boolean;
+		effects: OpenApiMethodProjection['effects'];
 		components?: {
 			schemas: Record<string, unknown>;
 		};
