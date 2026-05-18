@@ -76,25 +76,58 @@ type RenderGeneratedContractModuleOptions = {
 	methods: RpcAnalysisContext["methods"];
 };
 
+type InlineMethodEntry = {
+	methodName: string;
+	argsAliasName: string;
+	resultAliasName: string;
+	argsTypeReference: string;
+	resultTypeReference: string;
+	signature: string;
+	parameterNames: string[];
+	argsShape: TypeNodeShape;
+	resultShape: TypeNodeShape;
+	pathParts: string[];
+};
+
+type NamedObjectRegistryEntry = {
+	name: string;
+	shape: Extract<TypeNodeShape, { kind: "object" }>;
+};
+
+type NamedObjectRegistry = {
+	entries: NamedObjectRegistryEntry[];
+	nameByKey: Map<string, string>;
+	usedNames: Set<string>;
+};
+
 function renderGeneratedContractModule(options: RenderGeneratedContractModuleOptions): string {
+	const callableMethods = options.methods.filter((method) => method.effects.reason !== "property access");
 	const moduleSpecifier = options.moduleSpecifier ?? "@nogg-aholic/nrpc";
 	const runtimeImportPath = options.runtimeImportPath ?? "@nogg-aholic/nrpc/generated-codec-runtime";
-	const inlineMethods = options.methods
+	const baseInlineMethods = callableMethods
 		.map((method) => {
-			const methodTypeLiteral = renderRpcMethodLiteral(method, options.checker, options.policies);
-			const signature = renderRpcMethodImplementationSignature(method.argsShape, method.parameterNames, options.policies);
+			const typeBaseName = renderGeneratedMethodTypeBaseName(method.methodName);
+			const argsAliasName = `${typeBaseName}Args`;
+			const resultAliasName = `${typeBaseName}Result`;
 			return {
 				methodName: method.methodName,
-				argsTypeReference: methodTypeLiteral.argsTupleType,
-				resultTypeReference: methodTypeLiteral.resultType,
-				signature,
+				argsAliasName,
+				resultAliasName,
 				parameterNames: method.parameterNames,
 				argsShape: method.argsShape,
-				resultShape: normalizeType(unwrapPromiseLikeType(method.resultType, options.checker), options.checker, options.policies),
+				resultShape: normalizeEndpointMethodResultType(method, options.checker, options.policies),
 				pathParts: method.path,
 			};
 		})
 		.sort((a, b) => a.methodName.localeCompare(b.methodName));
+	const namedObjectRegistry = createNamedObjectRegistry(baseInlineMethods);
+	const namedObjectDeclarations = renderNamedObjectInterfaces(namedObjectRegistry, options.policies);
+	const inlineMethods: InlineMethodEntry[] = baseInlineMethods.map((entry) => ({
+		...entry,
+		argsTypeReference: renderTypeNode(entry.argsShape, options.policies, 0, namedObjectRegistry),
+		resultTypeReference: renderTypeNode(entry.resultShape, options.policies, 0, namedObjectRegistry),
+		signature: renderRpcMethodImplementationSignature(entry.argsShape, entry.parameterNames, options.policies, entry.argsAliasName),
+	}));
 	return [
 		"// AUTO-GENERATED FILE. DO NOT EDIT.",
 		`import {`,
@@ -103,16 +136,23 @@ function renderGeneratedContractModule(options: RenderGeneratedContractModuleOpt
 		`\tNRPC_METHOD_REF,`,
 		`\ttype HttpRouteManifest,`,
 		`\ttype RpcMethodCodec,`,
+		`\ttype RpcMethodRef,`,
 		`\ttype RpcMethodCodecFromRef,`,
 		`\ttype RpcMethodCallerFromCallable,`,
 		`\ttype RpcMethodRefFromCallable,`,
+		`\tattachRpcMethodMetadata,`,
 		`\tdefineRpcMethodRef,`,
+		`\twithRpcMethodCodec,`,
 		`} from ${JSON.stringify(moduleSpecifier)};`,
 		`import {`,
 		`\tcreateGeneratedRpcMethodCodec,`,
 		`\ttype GeneratedCodecShape,`,
 		`} from ${JSON.stringify(runtimeImportPath)};`,
 		`const createRpcCodecRegistry = (entries: ReadonlyArray<readonly [string, RpcMethodCodec<any[], any>]>) => { const registry = new Map<string, RpcMethodCodec<any[], any>>(entries); return (methodName: string) => registry.get(methodName); };`,
+		"",
+		namedObjectDeclarations,
+		namedObjectDeclarations ? "" : "",
+		renderInlineMethodTypeAliases(inlineMethods),
 		"",
 		`export const ${options.globalName}RpcDefinition = ${renderInlineSurfaceDefinition(inlineMethods, 0)};`,
 		"",
@@ -125,6 +165,100 @@ function renderGeneratedContractModule(options: RenderGeneratedContractModuleOpt
 	].join("\n");
 }
 
+
+function createNamedObjectRegistry(entries: Array<{ argsShape: TypeNodeShape; resultShape: TypeNodeShape }>): NamedObjectRegistry {
+	const registry: NamedObjectRegistry = {
+		entries: [],
+		nameByKey: new Map<string, string>(),
+		usedNames: new Set<string>(),
+	};
+	for (const entry of entries) {
+		collectNamedObjectShapes(entry.argsShape, registry);
+		collectNamedObjectShapes(entry.resultShape, registry);
+	}
+	return registry;
+}
+
+function collectNamedObjectShapes(shape: TypeNodeShape, registry: NamedObjectRegistry): void {
+	switch (shape.kind) {
+		case "optional":
+			collectNamedObjectShapes(shape.inner, registry);
+			return;
+		case "map":
+			collectNamedObjectShapes(shape.key, registry);
+			collectNamedObjectShapes(shape.value, registry);
+			return;
+		case "record":
+			collectNamedObjectShapes(shape.value, registry);
+			return;
+		case "set":
+		case "array":
+			collectNamedObjectShapes(shape.element, registry);
+			return;
+		case "union":
+			for (const variant of shape.variants) collectNamedObjectShapes(variant, registry);
+			return;
+		case "discriminated-union":
+			for (const variant of shape.variants) collectNamedObjectShapes(variant.shape, registry);
+			return;
+		case "tuple":
+			for (const element of shape.elements) collectNamedObjectShapes(element, registry);
+			return;
+		case "object": {
+			const registryKey = getNamedObjectRegistryKey(shape);
+			if (registryKey && !registry.nameByKey.has(registryKey)) {
+				const baseName = getNamedObjectBaseName(shape);
+				const name = reserveNamedObjectName(baseName, registry);
+				registry.nameByKey.set(registryKey, name);
+				registry.entries.push({ name, shape });
+			}
+			for (const property of shape.properties) collectNamedObjectShapes(property.shape, registry);
+			return;
+		}
+		default:
+			return;
+	}
+}
+
+function renderNamedObjectInterfaces(registry: NamedObjectRegistry, policies: Required<CodecPolicies>): string {
+	return registry.entries
+		.map((entry) => {
+			const body = renderObjectShape(entry.shape, policies, 0, undefined, undefined, registry, entry.name);
+			return `export interface ${entry.name} ${body}`;
+		})
+		.join("\n\n");
+}
+
+function getNamedObjectRegistryKey(shape: Extract<TypeNodeShape, { kind: "object" }>): string | undefined {
+	return shape.schemaId ?? shape.schemaName;
+}
+
+function getNamedObjectBaseName(shape: Extract<TypeNodeShape, { kind: "object" }>): string {
+	if (shape.schemaName) {
+		return renderGeneratedMethodTypeBaseName(shape.schemaName);
+	}
+	if (shape.schemaId) {
+		return renderGeneratedMethodTypeBaseName(shape.schemaId.replace(/[^A-Za-z0-9_$]+/g, " "));
+	}
+	return "GeneratedObject";
+}
+
+function reserveNamedObjectName(baseName: string, registry: NamedObjectRegistry): string {
+	let candidate = baseName;
+	let counter = 2;
+	while (registry.usedNames.has(candidate)) {
+		candidate = `${baseName}${counter}`;
+		counter += 1;
+	}
+	registry.usedNames.add(candidate);
+	return candidate;
+}
+
+function getRegisteredNamedObject(shape: Extract<TypeNodeShape, { kind: "object" }>, registry?: NamedObjectRegistry): string | undefined {
+	if (!registry) return undefined;
+	const key = getNamedObjectRegistryKey(shape);
+	return key ? registry.nameByKey.get(key) : undefined;
+}
 function stripRouteManifestTypeRefs(manifest: ReturnType<typeof generateHttpRouteManifest>) {
 	return {
 		...manifest,
@@ -141,7 +275,7 @@ function renderRpcMethodLiteral(
 		throw new Error(`Expected tuple args shape for ${method.methodName}.`);
 	}
 	const argsTupleType = `[${method.argsShape.elements.map((shape: TypeNodeShape) => renderTypeNode(shape, policies, 0)).join(", ")}]`;
-	const resultType = renderTypeNode(normalizeType(unwrapPromiseLikeType(method.resultType, checker), checker, policies), policies, 0);
+	const resultType = renderTypeNode(normalizeEndpointMethodResultType(method, checker, policies), policies, 0);
 	return {
 		argsTupleType,
 		resultType,
@@ -149,9 +283,24 @@ function renderRpcMethodLiteral(
 	};
 }
 
+function normalizeEndpointMethodResultType(
+	method: RpcAnalysisContext["methods"][number],
+	checker: ts.TypeChecker,
+	policies: Required<CodecPolicies>,
+): TypeNodeShape {
+	const callableSignatures = checker.getSignaturesOfType(method.resultType, ts.SignatureKind.Call);
+	const signature = callableSignatures[0];
+	const resultType = signature
+		? checker.getReturnTypeOfSignature(signature)
+		: method.resultType;
+	return normalizeType(unwrapPromiseLikeType(resultType, checker), checker, policies);
+}
+
 function renderInlineSurfaceDefinition(
 	entries: Array<{
 		methodName: string;
+		argsAliasName: string;
+		resultAliasName: string;
 		argsTypeReference: string;
 		resultTypeReference: string;
 		signature: string;
@@ -182,18 +331,42 @@ function renderInlineSurfaceDefinition(
 	}
 	for (const [group, groupEntries] of [...grouped.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
 		const directEntry = groupEntries.find((entry) => entry.pathParts.length === pathPrefix.length + 1);
+		const descendantEntries = groupEntries.filter((entry) => entry.pathParts.length > pathPrefix.length + 1);
 		if (directEntry) {
+			if (descendantEntries.length > 0) {
+				lines.push(
+					`${childIndent}${JSON.stringify(group)}: Object.assign(${renderInlineRpcMethod(directEntry, depth + 1)}, ${renderInlineSurfaceDefinition(descendantEntries, depth + 1, [...pathPrefix, group])}),`,
+				);
+				continue;
+			}
 			lines.push(`${childIndent}${JSON.stringify(group)}: ${renderInlineRpcMethod(directEntry, depth + 1)},`);
 			continue;
 		}
-		lines.push(`${childIndent}${JSON.stringify(group)}: ${renderInlineSurfaceDefinition(groupEntries, depth + 1, [...pathPrefix, group])},`);
+		lines.push(`${childIndent}${JSON.stringify(group)}: ${renderInlineSurfaceDefinition(descendantEntries, depth + 1, [...pathPrefix, group])},`);
 	}
 	lines.push(`${indent}}`);
 	return lines.join("\n");
 }
 
+function renderInlineMethodTypeAliases(entries: Array<{
+	methodName: string;
+	argsAliasName: string;
+	resultAliasName: string;
+	argsTypeReference: string;
+	resultTypeReference: string;
+}>): string {
+	return entries
+		.flatMap((entry) => [
+			`export type ${entry.argsAliasName} = ${entry.argsTypeReference};`,
+			`export type ${entry.resultAliasName} = ${entry.resultTypeReference};`,
+		])
+		.join("\n");
+}
+
 function renderInlineRpcMethod(entry: {
 	methodName: string;
+	argsAliasName: string;
+	resultAliasName: string;
 	argsTypeReference: string;
 	resultTypeReference: string;
 	signature: string;
@@ -207,12 +380,13 @@ function renderInlineRpcMethod(entry: {
 	const childIndent = "\t".repeat(depth + 1);
 	const callableType = `typeof ${methodIdentifier}`;
 	return [
-		`defineRpcMethodRef(async function ${methodIdentifier}(${entry.signature}): Promise<${entry.resultTypeReference}> {`,
-		`${childIndent}const caller = (${methodIdentifier} as any)[NRPC_METHOD_CALLER] as undefined | RpcMethodCallerFromCallable<${callableType}>;`,
+		`defineRpcMethodRef(async function ${methodIdentifier}(${entry.signature}): Promise<${entry.resultAliasName}> {`,
+		`${childIndent}const methodRef = ${methodIdentifier} as RpcMethodRefFromCallable<${callableType}>;`,
+		`${childIndent}const caller = methodRef[NRPC_METHOD_CALLER] as undefined | RpcMethodCallerFromCallable<${callableType}>;`,
 		`${childIndent}if (!caller) {`,
 		`${childIndent}\tthrow new Error(${JSON.stringify(`${entry.methodName} cannot be invoked directly. Resolve it through your RPC caller.`)});`,
 		`${childIndent}}`,
-		`${childIndent}return caller(${methodIdentifier} as RpcMethodRefFromCallable<${callableType}>, ...(${tupleArgs} as Parameters<${callableType}>));`,
+		`${childIndent}return caller(methodRef, ...(${tupleArgs} as Parameters<${callableType}>));`,
 		`${indent}})`
 	].join("\n");
 }
@@ -221,6 +395,8 @@ function renderInlineSurfaceMetadataAttachment(
 	globalName: string,
 	entries: Array<{
 		methodName: string;
+		argsAliasName: string;
+		resultAliasName: string;
 		argsTypeReference: string;
 		resultTypeReference: string;
 		signature: string;
@@ -230,20 +406,33 @@ function renderInlineSurfaceMetadataAttachment(
 		pathParts: string[];
 	}>,
 ): string {
-	const lines: string[] = [];
-	for (const entry of entries) {
+	const metadataEntries = entries.map((entry) => {
 		const accessor = `${globalName}RpcDefinition${entry.pathParts.map((part) => `[${JSON.stringify(part)}]`).join("")}`;
-		lines.push(`(${accessor} as any).__nrpcMethodName = ${JSON.stringify(entry.methodName)};`);
-		lines.push(`(${accessor} as any)[NRPC_METHOD_REF] = true;`);
-		lines.push(`(${accessor} as any)[NRPC_METHOD_CODEC] = ${globalName}CodecRegistry(${JSON.stringify(entry.methodName)}) as RpcMethodCodecFromRef<typeof ${accessor}>;`);
-	}
-	return lines.join("\n\n");
+		return `\t[${accessor}, ${JSON.stringify(entry.methodName)}] as const,`;
+	});
+	return [
+		`const attachGeneratedRpcMethodMetadata = <TMethod extends RpcMethodRef<any[], any>>(target: TMethod, methodName: string): TMethod => {`,
+		`\tattachRpcMethodMetadata(target, methodName);`,
+		`\twithRpcMethodCodec(target, ${globalName}CodecRegistry(methodName) as RpcMethodCodecFromRef<TMethod>);`,
+		`\treturn target;`,
+		`};`,
+		"",
+		`const ${globalName}MethodMetadataEntries = [`,
+		...metadataEntries,
+		`] as const;`,
+		"",
+		`for (const [target, methodName] of ${globalName}MethodMetadataEntries) {`,
+		`\tattachGeneratedRpcMethodMetadata(target, methodName);`,
+		`}`,
+	].join("\n");
 }
 
 function renderInlineCodecRegistryAttachment(
 	globalName: string,
 	entries: Array<{
 		methodName: string;
+		argsAliasName: string;
+		resultAliasName: string;
 		argsTypeReference: string;
 		resultTypeReference: string;
 		signature: string;
@@ -257,7 +446,7 @@ function renderInlineCodecRegistryAttachment(
 		.slice()
 		.sort((a, b) => a.methodName.localeCompare(b.methodName))
 		.map((entry) => {
-			return `\t[${JSON.stringify(entry.methodName)}, { args: ${JSON.stringify(entry.argsShape)}, result: ${JSON.stringify(entry.resultShape)} }] as const,`;
+			return `\t[${JSON.stringify(entry.methodName)}, { args: ${JSON.stringify(stripCodecShapeMetadata(entry.argsShape))}, result: ${JSON.stringify(stripCodecShapeMetadata(entry.resultShape))} }] as const,`;
 		});
 	return [
 		`export const ${globalName}CodecShapeEntries: ReadonlyArray<readonly [string, { args: GeneratedCodecShape; result: GeneratedCodecShape }]> = [`,
@@ -270,10 +459,53 @@ function renderInlineCodecRegistryAttachment(
 	].join("\n");
 }
 
+function stripCodecShapeMetadata(shape: TypeNodeShape): TypeNodeShape {
+	switch (shape.kind) {
+		case "optional":
+			return { ...shape, inner: stripCodecShapeMetadata(shape.inner) };
+		case "map":
+			return {
+				...shape,
+				key: stripCodecShapeMetadata(shape.key),
+				value: stripCodecShapeMetadata(shape.value),
+			};
+		case "record":
+			return { ...shape, value: stripCodecShapeMetadata(shape.value) };
+		case "set":
+		case "array":
+			return { ...shape, element: stripCodecShapeMetadata(shape.element) };
+		case "union":
+			return { ...shape, variants: shape.variants.map((variant) => stripCodecShapeMetadata(variant)) };
+		case "discriminated-union":
+			return {
+				...shape,
+				variants: shape.variants.map((variant) => ({
+					...variant,
+					shape: stripCodecShapeMetadata(variant.shape) as Extract<TypeNodeShape, { kind: "object" }>,
+				})),
+			};
+		case "tuple":
+			return { ...shape, elements: shape.elements.map((element) => stripCodecShapeMetadata(element)) };
+		case "object": {
+			const { schemaId: _schemaId, schemaName: _schemaName, ...rest } = shape;
+			return {
+				...rest,
+				properties: shape.properties.map((property) => ({
+					...property,
+					shape: stripCodecShapeMetadata(property.shape),
+				})),
+			};
+		}
+		default:
+			return shape;
+	}
+}
+
 function renderRpcMethodImplementationSignature(
 	argsShape: TypeNodeShape,
 	parameterNames: string[],
 	policies: Required<CodecPolicies>,
+	argsAliasName?: string,
 ): string {
 	if (argsShape.kind !== "tuple") {
 		throw new Error("Expected tuple args shape for RPC method implementation signature.");
@@ -290,9 +522,11 @@ function renderRpcMethodImplementationSignature(
 		.map((element, index) => {
 			const isOptional = element.kind === "optional";
 			const canUseOptionalSyntax = isOptional && index >= trailingOptionalStart;
-			const renderedType = canUseOptionalSyntax
-				? renderTypeNode(element.inner, policies, 0)
-				: renderTypeNode(element, policies, 0);
+			const renderedType = argsAliasName
+				? `${argsAliasName}[${index}]`
+				: canUseOptionalSyntax
+					? renderTypeNode(element.inner, policies, 0)
+					: renderTypeNode(element, policies, 0);
 			return `${parameterNames[index] ?? `arg${index}`}${canUseOptionalSyntax ? "?" : ""}: ${renderedType}`;
 		})
 		.join(", ");
@@ -302,6 +536,12 @@ function renderGeneratedMethodIdentifier(methodName: string): string {
 	const sanitized = methodName.replace(/[^A-Za-z0-9_$]/g, "_");
 	const prefixed = /^[A-Za-z_$]/.test(sanitized) ? sanitized : `_${sanitized}`;
 	return prefixed.length > 0 ? prefixed : "_nrpcMethod";
+}
+
+function renderGeneratedMethodTypeBaseName(methodName: string): string {
+	const sanitized = pascalize(methodName).replace(/[^A-Za-z0-9_$]/g, "");
+	const prefixed = /^[A-Za-z_$]/.test(sanitized) ? sanitized : `Method${sanitized}`;
+	return prefixed.length > 0 ? prefixed : "GeneratedMethod";
 }
 
 export function generateEndpointGlobalDeclaration(options: GenerateEndpointGlobalDeclarationOptions): string {
@@ -357,7 +597,7 @@ function renderParameterDeclaration(parameter: ts.Symbol, checker: ts.TypeChecke
 	return `${parameter.name}${isOptionalParameter ? "?" : ""}: ${renderTypeNode(normalized, policies, 0)}`;
 }
 
-function renderTypeNode(shape: TypeNodeShape, policies: Required<CodecPolicies>, depth: number): string {
+function renderTypeNode(shape: TypeNodeShape, policies: Required<CodecPolicies>, depth: number, registry?: NamedObjectRegistry): string {
 	switch (shape.kind) {
 		case "primitive":
 			return shape.primitive;
@@ -372,33 +612,41 @@ function renderTypeNode(shape: TypeNodeShape, policies: Required<CodecPolicies>,
 		case "undefined":
 			return "undefined";
 		case "optional":
-			return `${renderTypeNode(shape.inner, policies, depth)} | undefined`;
+			return `${renderTypeNode(shape.inner, policies, depth, registry)} | undefined`;
 		case "date":
 			return policies.date === "reject" ? "never" : "Date";
 		case "map":
-			return `Map<${renderTypeNode(shape.key, policies, depth)}, ${renderTypeNode(shape.value, policies, depth)}>`;
+			return `Map<${renderTypeNode(shape.key, policies, depth, registry)}, ${renderTypeNode(shape.value, policies, depth, registry)}>`;
 		case "record":
-			return `Record<string, ${renderTypeNode(shape.value, policies, depth)}>`;
+			return `Record<string, ${renderTypeNode(shape.value, policies, depth, registry)}>`;
 		case "set":
-			return `Set<${renderTypeNode(shape.element, policies, depth)}>`;
+			return `Set<${renderTypeNode(shape.element, policies, depth, registry)}>`;
 		case "union":
-			return shape.variants.map((variant) => renderTypeNode(variant, policies, depth)).join(" | ");
+			return shape.variants.map((variant) => renderTypeNode(variant, policies, depth, registry)).join(" | ");
 		case "discriminated-union":
-			return shape.variants.map((variant) => renderObjectShape(variant.shape, policies, depth, shape.discriminator, variant.tagValue)).join(" | ");
+			return shape.variants.map((variant) => renderObjectShape(variant.shape, policies, depth, shape.discriminator, variant.tagValue, registry)).join(" | ");
 		case "typed-array":
 			return shape.arrayType;
 		case "array":
-			return `Array<${renderTypeNode(shape.element, policies, depth)}>`;
+			return `Array<${renderTypeNode(shape.element, policies, depth, registry)}>`;
 		case "tuple":
-			return `[${shape.elements.map((element) => renderTypeNode(element, policies, depth)).join(", ")}]`;
+			return `[${shape.elements.map((element) => renderTypeNode(element, policies, depth, registry)).join(", ")}]`;
 		case "object":
-			return renderObjectShape(shape, policies, depth);
+			return getRegisteredNamedObject(shape, registry) ?? renderObjectShape(shape, policies, depth, undefined, undefined, registry);
 	}
 	return "unknown";
 }
 
 
-function renderObjectShape(shape: Extract<TypeNodeShape, { kind: "object" }>, policies: Required<CodecPolicies>, depth: number, discriminator?: string, tagValue?: string | number | boolean): string {
+function renderObjectShape(
+	shape: Extract<TypeNodeShape, { kind: "object" }>,
+	policies: Required<CodecPolicies>,
+	depth: number,
+	discriminator?: string,
+	tagValue?: string | number | boolean,
+	registry?: NamedObjectRegistry,
+	currentObjectName?: string,
+): string {
 	const indent = "  ".repeat(depth);
 	const childIndent = "  ".repeat(depth + 1);
 	const lines: string[] = ["{"];
@@ -409,7 +657,11 @@ function renderObjectShape(shape: Extract<TypeNodeShape, { kind: "object" }>, po
 			continue;
 		}
 		const optionalShape = property.shape.kind === "optional" ? property.shape : undefined;
-		const typeText = renderTypeNode(optionalShape ? optionalShape.inner : property.shape, policies, depth + 1);
+		const propertyShape = optionalShape ? optionalShape.inner : property.shape;
+		const namedObject = propertyShape.kind === "object" ? getRegisteredNamedObject(propertyShape, registry) : undefined;
+		const typeText = namedObject && namedObject !== currentObjectName
+			? namedObject
+			: renderTypeNode(propertyShape, policies, depth + 1, registry);
 		lines.push(`${childIndent}${propertyName}${optionalShape ? "?" : ""}: ${typeText};`);
 	}
 	lines.push(`${indent}}`);

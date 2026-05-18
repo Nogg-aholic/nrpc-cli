@@ -80,7 +80,7 @@ export function generateHttpRouteManifest(options: GenerateHttpRouteManifestOpti
 		rootPath: analysis.rootPath,
 		basePath,
 		protocolMode,
-		routes: analysis.methods.map((method) => {
+		routes: analysis.methods.filter((method) => method.effects.reason !== "property access").map((method) => {
 			const trimmedMethodPath = analysis.rootPath.length > 0 && method.path[0] === analysis.rootPath[analysis.rootPath.length - 1]
 				? method.path.slice(1)
 				: method.path;

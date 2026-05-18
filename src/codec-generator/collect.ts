@@ -1038,9 +1038,10 @@ function visitRpcMethodsInternal(
 		}
 
 		const propertyType = checker.getTypeOfSymbolAtLocation(property, declaration);
+		const signatures = checker.getSignaturesOfType(propertyType, ts.SignatureKind.Call);
 		const stopPrimitiveValueProperty = shouldStopAtPrimitiveValueProperty(declaration, propertyType, checker, pathParts.length, options);
 		const stopContainerValueProperty = shouldStopAtContainerValueProperty(declaration, propertyType, checker, pathParts.length, options);
-		if (isValuePropertyDeclaration(declaration)) {
+		if (isValuePropertyDeclaration(declaration) && signatures.length === 0) {
 			const methodName = nextPath.join('.');
 			if (!seenMethodNames.has(methodName)) {
 				try {
@@ -1056,7 +1057,6 @@ function visitRpcMethodsInternal(
 			continue;
 		}
 
-		const signatures = checker.getSignaturesOfType(propertyType, ts.SignatureKind.Call);
 		if (signatures.length > 0) {
 			const signature = signatures[0]!;
 			const methodName = nextPath.join(".");

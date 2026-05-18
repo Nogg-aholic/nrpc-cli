@@ -1,4 +1,4 @@
-import type * as ts from "typescript";
+import * as ts from "typescript";
 import {
 	normalizeType,
 	type CodecPolicies,
@@ -360,12 +360,25 @@ function buildMethodProjectionFromMethod(
 		: method.argsShape;
 	const requestSchema = typeShapeToOpenApiSchema(requestShape, analysis.checker, components, analysis.policies);
 	const responseSchema = typeShapeToOpenApiSchema(
-		normalizeType(unwrapPromiseLikeType(method.resultType, analysis.checker), analysis.checker, analysis.policies),
+		normalizeOpenApiMethodResultType(method, analysis.checker, analysis.policies),
 		analysis.checker,
 		components,
 		analysis.policies,
 	);
 	const docs = options.docs?.[method.methodName];
+
+function normalizeOpenApiMethodResultType(
+	method: CollectedRpcMethod,
+	checker: ts.TypeChecker,
+	policies: Required<CodecPolicies>,
+): TypeNodeShape {
+	const callableSignatures = checker.getSignaturesOfType(method.resultType, ts.SignatureKind.Call);
+	const signature = callableSignatures[0];
+	const resultType = signature
+		? checker.getReturnTypeOfSignature(signature)
+		: method.resultType;
+	return normalizeType(unwrapPromiseLikeType(resultType, checker), checker, policies);
+}
 
 	applyParamDescriptions(requestSchema, docs?.params);
 
