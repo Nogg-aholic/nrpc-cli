@@ -13,6 +13,7 @@ export type GeneratedDocsRuntimeArtifacts = {
 	html: string;
 	methods: ReadonlyMap<string, {
 		methodName: string;
+		httpMethod?: OpenApiMethodProjection['httpMethod'];
 		httpPath: string;
 		requestSchema: unknown;
 		responseSchema: unknown;
@@ -130,19 +131,21 @@ function buildOpenApiMethodDocumentFromProjection(
 		...(tagNames.length > 0 ? { tags: tagNames.map((name) => ({ name })) } : {}),
 		paths: {
 			[projection.httpPath]: {
-				post: {
+				[projection.httpMethod ?? 'post']: {
 					operationId: projection.methodName,
 					...(projection.docs?.summary ? { summary: projection.docs.summary } : {}),
 					...(projection.docs?.description ? { description: projection.docs.description } : {}),
 					...(projection.docs?.tags?.length ? { tags: projection.docs.tags } : { tags: inferTags(projection.methodName) }),
-					requestBody: {
-						required: projection.requestRequired,
-						content: {
-							'application/json': {
-								schema: projection.requestSchema,
+					...(projection.httpMethod === 'get' ? {} : {
+						requestBody: {
+							required: projection.requestRequired,
+							content: {
+								'application/json': {
+									schema: projection.requestSchema,
+								},
 							},
 						},
-					},
+					}),
 					responses: {
 						'200': {
 							description: projection.docs?.returnsDescription ?? `Result of ${projection.methodName}.`,

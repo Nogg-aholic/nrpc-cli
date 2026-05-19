@@ -12,6 +12,33 @@ export type OpenApiSchema = {
 	nullable?: boolean;
 };
 
+export type OpenApiHttpMethod = "get" | "post";
+
+export type OpenApiOperation = {
+	operationId: string;
+	summary?: string;
+	description?: string;
+	tags?: string[];
+	requestBody?: {
+		required: boolean;
+		content: {
+			"application/json": {
+				schema: OpenApiSchema;
+			};
+		};
+	};
+	responses: {
+		"200": {
+			description: string;
+			content: {
+				"application/json": {
+					schema: OpenApiSchema;
+				};
+			};
+		};
+	};
+};
+
 export type OpenApiDocument = {
 	openapi: "3.1.0";
 	info: {
@@ -23,35 +50,7 @@ export type OpenApiDocument = {
 		name: string;
 		description?: string;
 	}>;
-	paths: Record<
-		string,
-		{
-			post: {
-				operationId: string;
-				summary?: string;
-				description?: string;
-				tags?: string[];
-				requestBody: {
-					required: boolean;
-					content: {
-						"application/json": {
-							schema: OpenApiSchema;
-						};
-					};
-				};
-				responses: {
-					"200": {
-						description: string;
-						content: {
-							"application/json": {
-								schema: OpenApiSchema;
-							};
-						};
-					};
-				};
-			};
-		}
-	>;
+	paths: Record<string, Partial<Record<OpenApiHttpMethod, OpenApiOperation>>>;
 	components?: {
 		schemas: Record<string, OpenApiSchema>;
 	};
@@ -144,6 +143,7 @@ export type OpenApiSymbolSemanticFlags = {
 
 export type OpenApiMethodProjection = {
 	methodName: string;
+	httpMethod: OpenApiHttpMethod;
 	httpPath: string;
 	requestSchema: OpenApiSchema;
 	responseSchema: OpenApiSchema;

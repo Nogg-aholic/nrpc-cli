@@ -32,7 +32,7 @@ export type NrpcSurfaceTransport = {
   protocol: 'nrpc-http';
   entrypoint: {
     kind: 'invoke';
-    method: 'POST';
+    method: 'GET' | 'POST';
     path: string;
     requestContentType: 'application/json';
     responseContentType: 'application/json';

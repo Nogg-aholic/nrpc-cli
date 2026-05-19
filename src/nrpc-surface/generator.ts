@@ -29,11 +29,12 @@ export type GenerateNrpcSurfaceManifestOptions = {
 
 export function generateNrpcSurfaceManifest(options: GenerateNrpcSurfaceManifestOptions): NrpcSurfaceManifest {
   const analysis = analyzeRpcSurface(options);
-  const methods = analysis.methods
+  const endpointMethods = analysis.methods.filter(shouldProjectMethodAsEndpoint);
+  const methods = endpointMethods
     .map((method) => buildNrpcSurfaceMethodManifest(method, analysis, options))
     .sort((left, right) => left.methodName.localeCompare(right.methodName));
-  const httpBindings = analysis.methods
-    .map((method) => buildNrpcHttpBinding(method, analysis.rootPath, options.basePath))
+  const httpBindings = endpointMethods
+    .map((method) => buildNrpcHttpBinding(method, analysis, options.basePath))
     .sort((left, right) => left.methodName.localeCompare(right.methodName));
 
   return {
@@ -102,10 +103,10 @@ function buildNrpcSurfaceMethodManifest(
 
 function buildNrpcHttpBinding(
   method: CollectedRpcMethod,
-  rootPath: string[],
+  analysis: RpcAnalysisScaffold,
   basePath: string | undefined,
 ): NrpcHttpBinding {
-  const route = buildGeneratedRoute(method, rootPath, basePath);
+  const route = buildGeneratedRoute(method, analysis.rootPath, basePath);
   return {
     methodName: method.methodName,
     propertyPath: [...method.path],
@@ -113,13 +114,26 @@ function buildNrpcHttpBinding(
       protocol: 'nrpc-http',
       entrypoint: {
         kind: 'invoke',
-        method: 'POST',
+        method: inferNrpcHttpMethod(method, analysis),
         path: route.httpPath,
         requestContentType: 'application/json',
         responseContentType: 'application/json',
       },
     },
   };
+}
+
+function shouldProjectMethodAsEndpoint(method: CollectedRpcMethod): boolean {
+  return method.effects.reason !== 'property access';
+}
+
+function inferNrpcHttpMethod(method: CollectedRpcMethod, analysis: RpcAnalysisScaffold): 'GET' | 'POST' {
+  const hasInput = method.argsShape.kind !== 'tuple' || method.argsShape.elements.length > 0;
+  if (hasInput) {
+    return 'POST';
+  }
+
+  return normalizeMethodResultShape(method, analysis.checker, analysis.policies).kind === 'undefined' ? 'POST' : 'GET';
 }
 
 function tupleToRequestObjectShape(parameterNames: readonly string[], tupleShape: Extract<TypeNodeShape, { kind: 'tuple' }>): TypeNodeShape {

@@ -11,7 +11,7 @@ import {
 } from "./codec-generator.js";
 import { analyzeRpcSurface, createRpcAnalysisScaffold, generateHttpRouteManifest, type RpcAnalysisScaffold } from "./http-route-generator.js";
 import { renderScalarHtml, type RenderScalarHtmlOptions } from "./scalar-html.js";
-import type { OpenApiDocument, OpenApiMethodDocs, OpenApiMethodProjection, OpenApiSchema } from "./openapi-types.js";
+import type { OpenApiDocument, OpenApiHttpMethod, OpenApiMethodDocs, OpenApiMethodProjection, OpenApiOperation, OpenApiSchema } from "./openapi-types.js";
 
 export type GenerateOpenApiDocumentOptions = {
 	entryFile: string;
@@ -111,6 +111,9 @@ export function visitOpenApiMethodProjections(
 ): void {
 	const scaffold = createRpcAnalysisScaffold(options);
 	visitRpcMethods(scaffold.rootType, scaffold.checker, scaffold.policies, (method) => {
+		if (!shouldProjectMethodAsEndpoint(method)) {
+			return;
+		}
 		visitor(buildMethodProjectionFromMethod(method, scaffold, options));
 	}, [], {
 		allowedSourceFiles: options.traversal?.allowedSourceFiles,
@@ -137,33 +140,39 @@ export function buildOpenApiDocumentFromProjections(
 		paths: Object.fromEntries(projections.map((projection) => [
 			projection.httpPath,
 			{
-				post: {
-					operationId: projection.methodName,
-					...(projection.docs?.summary ? { summary: projection.docs.summary } : {}),
-					...(projection.docs?.description ? { description: projection.docs.description } : {}),
-					...(projection.docs?.tags?.length ? { tags: projection.docs.tags } : { tags: inferTags(projection.methodName) }),
-					requestBody: {
-						required: projection.requestRequired,
-						content: {
-							"application/json": {
-								schema: projection.requestSchema,
-							},
-						},
-					},
-					responses: {
-						"200": {
-							description: projection.docs?.returnsDescription ?? `Result of ${projection.methodName}.`,
-							content: {
-								"application/json": {
-									schema: projection.responseSchema,
-								},
-							},
-						},
-					},
-				},
+				[projection.httpMethod]: buildOpenApiOperation(projection),
 			},
 		])),
 		...(Object.keys(componentSchemas).length > 0 ? { components: { schemas: componentSchemas } } : {}),
+	};
+}
+
+function buildOpenApiOperation(projection: OpenApiMethodProjection): OpenApiOperation {
+	return {
+		operationId: projection.methodName,
+		...(projection.docs?.summary ? { summary: projection.docs.summary } : {}),
+		...(projection.docs?.description ? { description: projection.docs.description } : {}),
+		...(projection.docs?.tags?.length ? { tags: projection.docs.tags } : { tags: inferTags(projection.methodName) }),
+		...(projection.httpMethod === "post" ? {
+			requestBody: {
+				required: projection.requestRequired,
+				content: {
+					"application/json": {
+						schema: projection.requestSchema,
+					},
+				},
+			},
+		} : {}),
+		responses: {
+			"200": {
+				description: projection.docs?.returnsDescription ?? `Result of ${projection.methodName}.`,
+				content: {
+					"application/json": {
+						schema: projection.responseSchema,
+					},
+				},
+			},
+		},
 	};
 }
 
@@ -346,10 +355,17 @@ function buildMethodProjections(
 	const projections: OpenApiMethodProjection[] = [];
 
 	for (const method of analysis.methods) {
+		if (!shouldProjectMethodAsEndpoint(method)) {
+			continue;
+		}
 		projections.push(buildMethodProjectionFromMethod(method, analysis, options));
 	}
 
 	return projections;
+}
+
+function shouldProjectMethodAsEndpoint(method: CollectedRpcMethod): boolean {
+	return method.effects.reason !== "property access";
 }
 
 function buildMethodProjectionFromMethod(
@@ -388,6 +404,7 @@ function normalizeOpenApiMethodResultType(
 
 	return {
 		methodName: method.methodName,
+		httpMethod: inferOpenApiHttpMethod(method, responseSchema),
 		httpPath: route.httpPath,
 		requestSchema,
 		responseSchema,
@@ -406,6 +423,19 @@ function normalizeOpenApiMethodResultType(
 		...(components.size > 0 ? { components: { schemas: Object.fromEntries(components) } } : {}),
 		...(docs ? { docs } : {}),
 	};
+}
+
+function inferOpenApiHttpMethod(method: CollectedRpcMethod, responseSchema: OpenApiSchema): OpenApiHttpMethod {
+	const hasInput = method.argsShape.kind !== "tuple" || method.argsShape.elements.length > 0;
+	if (hasInput) {
+		return "post";
+	}
+
+	return isEmptyOutputSchema(responseSchema) ? "post" : "get";
+}
+
+function isEmptyOutputSchema(schema: OpenApiSchema): boolean {
+	return Object.keys(schema).length === 0;
 }
 
 function buildGeneratedRoute(method: CollectedRpcMethod, rootPath: string[], basePath: string | undefined): { httpPath: string } {
