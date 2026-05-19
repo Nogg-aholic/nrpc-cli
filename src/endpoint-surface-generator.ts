@@ -152,7 +152,7 @@ function renderGeneratedContractModule(options: RenderGeneratedContractModuleOpt
 		"",
 		namedObjectDeclarations,
 		namedObjectDeclarations ? "" : "",
-		renderInlineMethodTypeAliases(inlineMethods),
+		renderInlineMethodTypeAliases(inlineMethods, options.policies),
 		"",
 		`export const ${options.globalName}RpcDefinition = ${renderInlineSurfaceDefinition(inlineMethods, 0)};`,
 		"",
@@ -262,7 +262,14 @@ function getRegisteredNamedObject(shape: Extract<TypeNodeShape, { kind: "object"
 function stripRouteManifestTypeRefs(manifest: ReturnType<typeof generateHttpRouteManifest>) {
 	return {
 		...manifest,
-		routes: manifest.routes.map(({ argsTypeReference: _argsTypeReference, resultTypeReference: _resultTypeReference, ...route }) => route),
+		routes: manifest.routes.map((route) => {
+			const {
+				argsTypeReference: _argsTypeReference,
+				resultTypeReference: _resultTypeReference,
+				...rest
+			} = route;
+			return rest;
+		}),
 	};
 }
 
@@ -354,13 +361,27 @@ function renderInlineMethodTypeAliases(entries: Array<{
 	resultAliasName: string;
 	argsTypeReference: string;
 	resultTypeReference: string;
-}>): string {
+	argsShape: TypeNodeShape;
+}>, policies: Required<CodecPolicies>): string {
 	return entries
 		.flatMap((entry) => [
-			`export type ${entry.argsAliasName} = ${entry.argsTypeReference};`,
+			renderPublicArgsAlias(entry.argsAliasName, entry.argsShape, entry.argsTypeReference, policies),
 			`export type ${entry.resultAliasName} = ${entry.resultTypeReference};`,
 		])
 		.join("\n");
+}
+
+function renderPublicArgsAlias(
+	argsAliasName: string,
+	argsShape: TypeNodeShape,
+	argsTypeReference: string,
+	policies: Required<CodecPolicies>,
+): string {
+	if (argsShape.kind === "tuple" && argsShape.elements.length === 1) {
+		return `export type ${argsAliasName} = ${renderTypeNode(argsShape.elements[0]!, policies, 0)};`;
+	}
+
+	return `export type ${argsAliasName} = ${argsTypeReference};`;
 }
 
 function renderInlineRpcMethod(entry: {
@@ -522,8 +543,11 @@ function renderRpcMethodImplementationSignature(
 		.map((element, index) => {
 			const isOptional = element.kind === "optional";
 			const canUseOptionalSyntax = isOptional && index >= trailingOptionalStart;
+			const singleArgumentAlias = argsAliasName && argsShape.elements.length === 1;
 			const renderedType = argsAliasName
-				? `${argsAliasName}[${index}]`
+				? singleArgumentAlias
+					? argsAliasName
+					: `${argsAliasName}[${index}]`
 				: canUseOptionalSyntax
 					? renderTypeNode(element.inner, policies, 0)
 					: renderTypeNode(element, policies, 0);

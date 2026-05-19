@@ -6,6 +6,12 @@
     "lib": ["ES2022", "DOM"],
     "ignoreDeprecations": "6.0",
     "types": ["node", "bun"],
+    "baseUrl": ".",
+    "paths": {
+      "@nogg-aholic/nrpc": ["../nRPC/dist/index.d.ts", "../nRPC/src/index.ts"],
+      "@nogg-aholic/nrpc/*": ["../nRPC/dist/*.d.ts", "../nRPC/src/*.ts"]
+    },
+    "rootDir": "./src",
     "outDir": "./dist",
     "declaration": true,
     "sourceMap": true,
@@ -14,6 +20,7 @@
   },
   "include": [
     "./src/**/*.ts",
-    "./packages/**/*.ts"
+    "./packages/**/*.ts",
+    "./src/**/*.d.ts"
   ]
 }

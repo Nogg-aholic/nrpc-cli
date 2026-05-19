@@ -26,6 +26,12 @@ bun add @nogg-aholic/nrpc @nogg-aholic/nrpc-cli
 
 `@nogg-aholic/nrpc` is a peer dependency because generated artifacts target the runtime package.
 
+Install `@nogg-aholic/nrpc-cli` as a dev dependency.
+The intended model is:
+
+- `@nogg-aholic/nrpc-cli` only during development/generation
+- `@nogg-aholic/nrpc` at runtime
+
 ## Purpose
 
 This package owns:
@@ -40,6 +46,32 @@ This package owns:
 - canonical NRPC surface manifest generation
 
 It does not duplicate runtime behavior. Runtime code stays in `@nogg-aholic/nrpc`.
+
+For runtime endpoint wiring, do not use this README as the primary guide.
+Use the runtime package docs instead.
+
+## Recommended Project Layout
+
+The preferred layout is:
+
+```text
+scripts/
+	generate.ts
+src/
+	service.ts
+	server.ts
+	client/
+	generated/
+```
+
+Important rule:
+
+- put generation code in `scripts/`
+- keep runtime code and generated output in `src/`
+
+This is the pattern used by `rpc-example` and is the intended non-legacy setup.
+
+Old patterns like keeping generation entrypoints under `src/` or relying on `contracts/` folders should not be reintroduced.
 
 ## CLI Commands
 
@@ -77,6 +109,9 @@ nrpc-generate-endpoint-surface \
 	--global api
 ```
 
+In real project wiring, prefer a checked-in `scripts/generate.ts` file over long-lived manual CLI commands.
+That generation script should resolve `src/service.ts` and emit into `src/generated/`.
+
 ### Generate From OpenAPI JSON
 
 ```bash
@@ -93,6 +128,9 @@ Expected emitted artifact set:
 - `./src/generated/third-party-api.contract.ts`
 - `./src/generated/third-party-api.surface.docs.ts`
 - `./src/generated/third-party-api.mcp-tools.ts`
+
+If you only need MCP output from the OpenAPI-derived path, use output selection and emit only the MCP tools artifact.
+Do not generate extra wrapper artifacts unless there is a real consumer for them.
 
 ### Generate A Package Target
 
@@ -140,6 +178,12 @@ Current top-level structure:
 
 OpenAPI is now a derived transport/docs projection, not the canonical semantic source.
 
+The architectural direction is:
+
+- one canonical semantic manifest pipeline
+- transport/docs/MCP outputs derived from it
+- emit only the outputs the consumer actually needs
+
 For difficult ambient or host-provided types, the manifest may intentionally fall back to `unknown` runtime shapes while preserving method signature metadata so generation can complete.
 
 ### Generate From GraphQL Operations
@@ -185,6 +229,11 @@ Current repository layout relies on sibling-package development wiring, especial
 That keeps the split at two published packages without introducing parallel code paths.
 
 Repository-local package-target source folders under `packages/` are generation inputs and fixtures. They are not part of the public published surface of `@nogg-aholic/nrpc-cli`.
+
+Generated artifacts should be self-contained.
+They should not require `@nogg-aholic/nrpc-cli` at runtime.
+
+That includes generated docs artifacts: they should inline the runtime helpers they need rather than importing generator-side files.
 
 ## Verification
 

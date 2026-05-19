@@ -168,6 +168,10 @@ export function buildOpenApiDocumentFromProjections(
 }
 
 function tupleToRequestObjectShape(parameterNames: readonly string[], tupleShape: Extract<TypeNodeShape, { kind: "tuple" }>): TypeNodeShape {
+	if (tupleShape.elements.length === 1) {
+		return tupleShape.elements[0] ?? { kind: "object", properties: [] };
+	}
+
 	return {
 		kind: "object",
 		properties: tupleShape.elements.map((shape, index) => ({

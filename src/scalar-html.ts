@@ -24,6 +24,23 @@ export function renderScalarHtml(document: OpenApiDocument, options: RenderScala
 			display: none !important;
 		}
 
+    #headlessui-portal-root {
+      display: none !important;
+    }
+
+    .scalar-app .z-overlay {
+      pointer-events: none !important;
+      z-index: auto !important;
+    }
+
+    .scalar-app .references-layout,
+    .scalar-app .api-client__layout,
+    .scalar-app .reference-layout,
+    .scalar-app .reference-layout__content,
+    .scalar-app .reference-layout__section {
+      max-width: 100% !important;
+    }
+
 		.scalar-app {
 			min-height: 100vh;
 		}
@@ -48,15 +65,15 @@ export function renderScalarHtml(document: OpenApiDocument, options: RenderScala
       Scalar.createApiReference('#scalar-root', {
         theme: 'default',
         darkMode: window.matchMedia('(prefers-color-scheme: dark)').matches,
-        layout: 'modern',
-        showSidebar: true,
-        hideModels: true,
+          layout: 'modern',
+          showSidebar: true,
+          hideModels: false,
         documentDownloadType: 'both',
-        hideTestRequestButton: true,
+          hideTestRequestButton: false,
         hideClientButton: true,
         hiddenClients: true,
         showOperationId: false,
-        showDeveloperTools: 'never',
+          showDeveloperTools: true,
         metaData: { title: ${JSON.stringify(pageTitle)} },
         customCss: ${JSON.stringify(customCss)},
         content: ${JSON.stringify(document)},

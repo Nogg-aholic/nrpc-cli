@@ -162,7 +162,7 @@
     "prepack": "bun run build"
   },
   "peerDependencies": {
-    "@nogg-aholic/nrpc": "^0.4.7"
+    "@nogg-aholic/nrpc": "latest"
   },
   "peerDependenciesMeta": {
     "@nogg-aholic/nrpc": {

@@ -1,6 +1,6 @@
 import type { CodecPolicies, SurfaceTraversalOptions, VirtualProgramSource } from "./codec-generator.js";
 import { camelize, collectRpcMethods, createProgram, defaultPolicies, getTypeFromExportedAlias } from "./codec-generator.js";
-import type { HttpProtocolMode, HttpRouteManifest, HttpRouteManifestEntry } from "@nogg-aholic/nrpc/http-route-runtime";
+import type { HttpProtocolMode, HttpRouteManifest, HttpRouteManifestEntry } from "@nogg-aholic/nrpc";
 
 export type RpcAnalysisScaffold = {
 	policies: Required<CodecPolicies>;
@@ -92,6 +92,9 @@ export function generateHttpRouteManifest(options: GenerateHttpRouteManifestOpti
 				httpPath: joinHttpPath(basePath, pathParts),
 				codecLookupKey: method.methodName,
 				protocolMode,
+				parameterNames: [...method.parameterNames],
+				parameterOptionalFlags: [...method.parameterOptionalFlags],
+				parameterRestFlags: [...method.parameterRestFlags],
 				argsTypeReference: `Parameters<${rootAccessor}>`,
 				resultTypeReference: `Awaited<ReturnType<${rootAccessor}>>`,
 			};

@@ -30,6 +30,23 @@ function getTypeParameterNameFromDeclarationText(text: string): string {
 	return text.split(/\sextends\s|\s*=\s/u)[0]!.trim();
 }
 
+function hasTypeParameters(
+	declaration: ts.Declaration | ts.SignatureDeclaration,
+): declaration is (ts.SignatureDeclaration | ts.ClassLikeDeclaration | ts.InterfaceDeclaration | ts.TypeAliasDeclaration) & {
+	typeParameters?: ts.NodeArray<ts.TypeParameterDeclaration>;
+} {
+	return ts.isCallSignatureDeclaration(declaration)
+		|| ts.isConstructSignatureDeclaration(declaration)
+		|| ts.isMethodSignature(declaration)
+		|| ts.isMethodDeclaration(declaration)
+		|| ts.isFunctionDeclaration(declaration)
+		|| ts.isFunctionTypeNode(declaration)
+		|| ts.isConstructorTypeNode(declaration)
+		|| ts.isClassLike(declaration)
+		|| ts.isInterfaceDeclaration(declaration)
+		|| ts.isTypeAliasDeclaration(declaration);
+}
+
 function collectSignatureGenericTypeParameters(signature: ts.Signature): string[] {
 	const declaration = signature.getDeclaration();
 	if (!declaration) {
@@ -53,7 +70,7 @@ function collectSignatureGenericTypeParameters(signature: ts.Signature): string[
 	if (parent && (ts.isInterfaceDeclaration(parent) || ts.isClassDeclaration(parent))) {
 		addParameters(parent.typeParameters);
 	}
-	if ('typeParameters' in declaration) {
+	if (hasTypeParameters(declaration)) {
 		addParameters(declaration.typeParameters);
 	}
 
@@ -276,6 +293,33 @@ function canonicalizeFileName(fileName: string): string {
 	return ts.sys.useCaseSensitiveFileNames ? normalized : normalized.toLowerCase();
 }
 
+function isDeclarationNode(node: ts.Node | undefined): node is ts.Declaration {
+	if (!node) {
+		return false;
+	}
+
+	return ts.isClassDeclaration(node)
+		|| ts.isInterfaceDeclaration(node)
+		|| ts.isTypeAliasDeclaration(node)
+		|| ts.isFunctionDeclaration(node)
+		|| ts.isMethodDeclaration(node)
+		|| ts.isMethodSignature(node)
+		|| ts.isPropertyDeclaration(node)
+		|| ts.isPropertySignature(node)
+		|| ts.isVariableDeclaration(node)
+		|| ts.isParameter(node)
+		|| ts.isEnumDeclaration(node)
+		|| ts.isEnumMember(node)
+		|| ts.isModuleDeclaration(node)
+		|| ts.isGetAccessorDeclaration(node)
+		|| ts.isSetAccessorDeclaration(node)
+		|| ts.isConstructorDeclaration(node)
+		|| ts.isConstructSignatureDeclaration(node)
+		|| ts.isCallSignatureDeclaration(node)
+		|| ts.isIndexSignatureDeclaration(node)
+		|| ts.isTypeParameterDeclaration(node);
+}
+
 function getTypeId(type: ts.Type): number | undefined {
 	return typeof (type as ts.Type & { id?: unknown }).id === "number"
 		? (type as ts.Type & { id: number }).id
@@ -314,7 +358,7 @@ function isPropertyDeclaredOnType(property: ts.Symbol, type: ts.Type): boolean {
 	const ownerSet = new Set(ownerDeclarations);
 	return declarations.some((declaration) => {
 		const parent = declaration.parent;
-		return ownerSet.has(declaration) || (parent ? ownerSet.has(parent) : false);
+		return ownerSet.has(declaration) || (isDeclarationNode(parent) ? ownerSet.has(parent) : false);
 	});
 }
 
@@ -330,7 +374,10 @@ function getModifierFlags(declaration: ts.SignatureDeclaration | ts.Declaration 
 	if (!declaration) {
 		return 0;
 	}
-	return ts.getCombinedModifierFlags(declaration as ts.Declaration);
+	if (!ts.canHaveModifiers(declaration)) {
+		return 0;
+	}
+	return ts.getCombinedModifierFlags(declaration);
 }
 
 function getNodeFlags(declaration: ts.SignatureDeclaration | ts.Declaration | undefined): number {
@@ -438,10 +485,13 @@ function toRelationTargetRefFromSymbol(symbol: ts.Symbol | undefined): RelationT
 }
 
 function collectDeclarationTypeParameters(declaration: ts.SignatureDeclaration | ts.Declaration | undefined): string[] {
-	if (!declaration || !('typeParameters' in declaration)) {
+	if (!declaration) {
 		return [];
 	}
-	return (declaration.typeParameters ?? []).map((parameter) => parameter.name.getText().trim());
+	if (hasTypeParameters(declaration)) {
+		return (declaration.typeParameters ?? []).map((parameter: ts.TypeParameterDeclaration) => parameter.name.getText().trim());
+	}
+	return [];
 }
 
 function buildSymbolSemanticFlags(
@@ -529,7 +579,8 @@ function buildSymbolRelations(
 	}
 
 	if (parent && (ts.isTypeAliasDeclaration(parent) || ts.isInterfaceDeclaration(parent) || ts.isClassDeclaration(parent))) {
-		const parentRef = toRelationTargetRefFromSymbol(checker.getSymbolAtLocation(parent.name));
+		const parentSymbol = parent.name ? checker.getSymbolAtLocation(parent.name) : undefined;
+		const parentRef = toRelationTargetRefFromSymbol(parentSymbol);
 		if (parentRef) {
 			relations.memberOf = relations.memberOf ?? parentRef;
 		}

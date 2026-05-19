@@ -16,23 +16,43 @@ import { renderNrpcSurfaceDocs, renderOpenApiSurfaceDocs } from './openapi-surfa
 import { renderOpenApiMcpTools } from './openapi-surface/mcp-renderer.js';
 import { buildMethodTypeBaseName, pascalize, safePropertyName, type OpenApiSurfaceMethod } from './openapi-surface/renderer-shared.js';
 
+export type OpenApiSurfaceOutputSelection = {
+  contract?: boolean;
+  docs?: boolean;
+  mcp?: boolean;
+};
+
 export type GenerateOpenApiSurfaceOptions = {
-  openApiFile: string;
+  openApiFile?: string;
+  openApiDocument?: OpenApiDocumentLike;
   outputImportPath: string;
   rootTypeName?: string;
   globalName?: string;
   rootPath?: string[];
   manifest?: NrpcSurfaceManifest;
+  outputs?: OpenApiSurfaceOutputSelection;
 };
 
 export type GeneratedOpenApiSurfaceResult = {
-  contractText: string;
-  docsText: string;
-  mcpToolsText: string;
+  contractText?: string;
+  docsText?: string;
+  mcpToolsText?: string;
 };
 
+export function requireOpenApiSurfaceOutput<TValue>(value: TValue | undefined, outputName: 'contract' | 'docs' | 'mcp'): TValue {
+  if (value === undefined) {
+    throw new Error(`Requested OpenAPI surface output "${outputName}" was not generated.`);
+  }
+
+  return value;
+}
+
 export function generateOpenApiSurface(options: GenerateOpenApiSurfaceOptions): GeneratedOpenApiSurfaceResult {
-  const document = readOpenApiDocument(options.openApiFile);
+  const document = options.openApiDocument
+    ?? (options.openApiFile ? readOpenApiDocument(options.openApiFile) : undefined);
+  if (!document) {
+    throw new Error('generateOpenApiSurface requires either openApiDocument or openApiFile.');
+  }
   const typeRenderContext = createSurfaceTypeRenderContext(document);
   const methods = options.manifest
     ? collectNrpcSurfaceMethods(options.manifest, typeRenderContext)
@@ -40,32 +60,55 @@ export function generateOpenApiSurface(options: GenerateOpenApiSurfaceOptions): 
   const globalName = options.globalName ?? 'openApi';
   const rootTypeName = options.rootTypeName ?? 'OpenApiSurface';
   const rootPath = options.rootPath ?? [globalName];
+  const outputs = resolveOpenApiSurfaceOutputs(options.outputs);
 
-  const contractText = renderOpenApiSurfaceContract({
-    componentTypeDeclarations: [...typeRenderContext.componentTypeDeclarations.values()],
-    methods,
-    globalName,
-    rootTypeName,
-    rootPath,
-  });
-
-  const docsText = options.manifest
-    ? renderNrpcSurfaceDocs({
-        document,
+  const contractText = outputs.contract
+    ? renderOpenApiSurfaceContract({
+        componentTypeDeclarations: [...typeRenderContext.componentTypeDeclarations.values()],
         methods,
-        manifest: options.manifest,
+        globalName,
+        rootTypeName,
+        rootPath,
       })
-    : renderOpenApiSurfaceDocs({
-        document,
-        methods,
-      });
+    : undefined;
 
-  const mcpToolsText = renderOpenApiMcpTools({
-    globalName,
-    methods,
-  });
+  const docsText = outputs.docs
+    ? (options.manifest
+        ? renderNrpcSurfaceDocs({
+            document,
+            methods,
+            manifest: options.manifest,
+          })
+        : renderOpenApiSurfaceDocs({
+            document,
+            methods,
+          }))
+    : undefined;
+
+  const mcpToolsText = outputs.mcp
+    ? renderOpenApiMcpTools({
+        globalName,
+        methods,
+      })
+    : undefined;
 
   return { contractText, docsText, mcpToolsText };
+}
+
+function resolveOpenApiSurfaceOutputs(outputs: OpenApiSurfaceOutputSelection | undefined): Required<OpenApiSurfaceOutputSelection> {
+  if (!outputs) {
+    return {
+      contract: true,
+      docs: true,
+      mcp: true,
+    };
+  }
+
+  return {
+    contract: outputs.contract === true,
+    docs: outputs.docs === true,
+    mcp: outputs.mcp === true,
+  };
 }
 
 type SurfaceTypeRenderContext = {
@@ -146,7 +189,7 @@ function nrpcRuntimeShapeToOpenApiSchema(shape: import('./nrpc-surface/types.js'
     case 'primitive':
       return { type: shape.primitive };
     case 'bigint':
-      return { type: 'string', title: 'bigint' };
+      return { type: 'string' };
     case 'unknown':
     case 'undefined':
       return {};
@@ -160,7 +203,7 @@ function nrpcRuntimeShapeToOpenApiSchema(shape: import('./nrpc-surface/types.js'
     case 'optional':
       return nrpcRuntimeShapeToOpenApiSchema(shape.inner ?? { kind: 'unknown' });
     case 'date':
-      return shape.datePolicy === 'epoch-ms' ? { type: 'number', title: 'Date' } : { type: 'string', title: 'Date' };
+      return shape.datePolicy === 'epoch-ms' ? { type: 'number' } : { type: 'string' };
     case 'map':
       if (shape.mapPolicy === 'object' && shape.keyShape?.kind === 'primitive' && shape.keyShape.primitive === 'string') {
         return {
@@ -191,7 +234,7 @@ function nrpcRuntimeShapeToOpenApiSchema(shape: import('./nrpc-surface/types.js'
     case 'discriminated-union':
       return { anyOf: (shape.variants ?? []).map((variant) => nrpcRuntimeShapeToOpenApiSchema(variant)) };
     case 'typed-array':
-      return { type: 'array', items: { type: 'number' }, title: shape.arrayType };
+      return { type: 'array', items: { type: 'number' } };
     case 'tuple':
       return { type: 'array', items: (shape.elements?.length ?? 0) > 0 ? { anyOf: (shape.elements ?? []).map((entry) => nrpcRuntimeShapeToOpenApiSchema(entry)) } : {} };
     case 'object':
