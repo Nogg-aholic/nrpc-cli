@@ -8,7 +8,7 @@ import {
 } from './openapi-generator.js';
 import { generateNrpcSurfaceManifest } from './nrpc-surface/generator.js';
 import type { OpenApiMethodProjection } from './openapi-types.js';
-import { generateOpenApiSurface } from './openapi-surface-generator.js';
+import { generateOpenApiSurface, requireOpenApiSurfaceOutput } from './openapi-surface-generator.js';
 
 export type PackageTargetConfig = {
   name: string;
@@ -125,9 +125,13 @@ export async function generatePackageTargetArtifacts(config: PackageTargetConfig
     manifest,
   });
 
-  await fs.writeFile(contractPath, surface.contractText, 'utf8');
-  await fs.writeFile(docsPath, surface.docsText, 'utf8');
-  await fs.writeFile(mcpToolsPath, surface.mcpToolsText, 'utf8');
+  const contractText = requireOpenApiSurfaceOutput(surface.contractText, 'contract');
+  const docsText = requireOpenApiSurfaceOutput(surface.docsText, 'docs');
+  const mcpToolsText = requireOpenApiSurfaceOutput(surface.mcpToolsText, 'mcp');
+
+  await fs.writeFile(contractPath, contractText, 'utf8');
+  await fs.writeFile(docsPath, docsText, 'utf8');
+  await fs.writeFile(mcpToolsPath, mcpToolsText, 'utf8');
 
   await syncArtifactsToNodeTypes(config, {
     manifestPath,
@@ -147,8 +151,8 @@ export async function generatePackageTargetArtifacts(config: PackageTargetConfig
     mcpToolsPath,
     manifestBytes: Buffer.byteLength(manifestText, 'utf8'),
     openApiBytes: Buffer.byteLength(openApiText, 'utf8'),
-    contractBytes: Buffer.byteLength(surface.contractText, 'utf8'),
-    docsBytes: Buffer.byteLength(surface.docsText, 'utf8'),
-    mcpToolsBytes: Buffer.byteLength(surface.mcpToolsText, 'utf8'),
+    contractBytes: Buffer.byteLength(contractText, 'utf8'),
+    docsBytes: Buffer.byteLength(docsText, 'utf8'),
+    mcpToolsBytes: Buffer.byteLength(mcpToolsText, 'utf8'),
   };
 }

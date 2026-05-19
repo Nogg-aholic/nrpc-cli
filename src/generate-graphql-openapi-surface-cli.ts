@@ -10,7 +10,7 @@ import {
 import { analyzeGraphqlOperations } from './graphql/operation-analyzer.js';
 import { generateGraphqlOpenApi } from './graphql/openapi-generator.js';
 import { extractGraphqlOperationsFromPostmanCollection } from './graphql/postman-collection.js';
-import { generateOpenApiSurface } from './openapi-surface-generator.js';
+import { generateOpenApiSurface, requireOpenApiSurfaceOutput } from './openapi-surface-generator.js';
 
 type GraphqlIntrospectionEnvelope = {
   data?: IntrospectionQuery;
@@ -110,9 +110,9 @@ const openApiSurface = generateOpenApiSurface({
 });
 
 await fs.mkdir(path.dirname(contractOutFile), { recursive: true });
-await fs.writeFile(contractOutFile, openApiSurface.contractText, 'utf8');
-await fs.writeFile(docsOutFile, openApiSurface.docsText, 'utf8');
-await fs.writeFile(mcpToolsOutFile, openApiSurface.mcpToolsText, 'utf8');
+await fs.writeFile(contractOutFile, requireOpenApiSurfaceOutput(openApiSurface.contractText, 'contract'), 'utf8');
+await fs.writeFile(docsOutFile, requireOpenApiSurfaceOutput(openApiSurface.docsText, 'docs'), 'utf8');
+await fs.writeFile(mcpToolsOutFile, requireOpenApiSurfaceOutput(openApiSurface.mcpToolsText, 'mcp'), 'utf8');
 
 if (graphqlSource.skippedOperations.length) {
   console.warn(

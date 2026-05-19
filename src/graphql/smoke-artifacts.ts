@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import { generateGraphqlOpenApi } from './openapi-generator.js';
-import { generateOpenApiSurface } from '../openapi-surface-generator.js';
+import { generateOpenApiSurface, requireOpenApiSurfaceOutput } from '../openapi-surface-generator.js';
 
 export const graphqlSmokeSchema = /* GraphQL */ `
   scalar DateTime
@@ -81,9 +81,9 @@ export function buildGraphqlSmokeArtifacts(): GraphqlSmokeArtifacts {
 
   return {
     openApiJson,
-    contractText: openApiSurface.contractText,
-    docsText: openApiSurface.docsText,
-    mcpToolsText: openApiSurface.mcpToolsText,
+    contractText: requireOpenApiSurfaceOutput(openApiSurface.contractText, 'contract'),
+    docsText: requireOpenApiSurfaceOutput(openApiSurface.docsText, 'docs'),
+    mcpToolsText: requireOpenApiSurfaceOutput(openApiSurface.mcpToolsText, 'mcp'),
   };
 }
 
@@ -113,7 +113,7 @@ export async function writeGraphqlSmokeArtifacts(outDir: string): Promise<void> 
     rootPath: ['graphqlSmoke'],
   });
 
-  await fs.writeFile(path.join(outDir, 'graphql-smoke.contract.ts'), openApiSurface.contractText, 'utf8');
-  await fs.writeFile(path.join(outDir, 'graphql-smoke.surface.docs.ts'), openApiSurface.docsText, 'utf8');
-  await fs.writeFile(path.join(outDir, 'graphql-smoke.mcp-tools.ts'), openApiSurface.mcpToolsText, 'utf8');
+  await fs.writeFile(path.join(outDir, 'graphql-smoke.contract.ts'), requireOpenApiSurfaceOutput(openApiSurface.contractText, 'contract'), 'utf8');
+  await fs.writeFile(path.join(outDir, 'graphql-smoke.surface.docs.ts'), requireOpenApiSurfaceOutput(openApiSurface.docsText, 'docs'), 'utf8');
+  await fs.writeFile(path.join(outDir, 'graphql-smoke.mcp-tools.ts'), requireOpenApiSurfaceOutput(openApiSurface.mcpToolsText, 'mcp'), 'utf8');
 }

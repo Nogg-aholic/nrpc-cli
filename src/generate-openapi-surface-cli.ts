@@ -2,7 +2,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { generateOpenApiSurface } from './openapi-surface-generator.js';
+import { generateOpenApiSurface, requireOpenApiSurfaceOutput } from './openapi-surface-generator.js';
 
 function readArg(flag: string): string | undefined {
   const index = process.argv.indexOf(flag);
@@ -41,6 +41,6 @@ const generated = generateOpenApiSurface({
 });
 
 await fs.mkdir(path.dirname(contractOutFile), { recursive: true });
-await fs.writeFile(contractOutFile, generated.contractText, 'utf8');
-await fs.writeFile(docsOutFile, generated.docsText, 'utf8');
-await fs.writeFile(mcpToolsOutFile, generated.mcpToolsText, 'utf8');
+await fs.writeFile(contractOutFile, requireOpenApiSurfaceOutput(generated.contractText, 'contract'), 'utf8');
+await fs.writeFile(docsOutFile, requireOpenApiSurfaceOutput(generated.docsText, 'docs'), 'utf8');
+await fs.writeFile(mcpToolsOutFile, requireOpenApiSurfaceOutput(generated.mcpToolsText, 'mcp'), 'utf8');
