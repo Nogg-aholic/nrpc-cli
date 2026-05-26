@@ -280,7 +280,7 @@ function getRegisteredNamedObject(shape: Extract<TypeNodeShape, { kind: "object"
 function stripRouteManifestTypeRefs(manifest: ReturnType<typeof generateHttpRouteManifest>) {
 	return {
 		...manifest,
-		routes: manifest.routes.map((route) => {
+		routes: manifest.routes.map((route: ReturnType<typeof generateHttpRouteManifest>["routes"][number]) => {
 			const {
 				argsTypeReference: _argsTypeReference,
 				resultTypeReference: _resultTypeReference,
