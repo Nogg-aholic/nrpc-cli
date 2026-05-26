@@ -20,6 +20,7 @@ const config = await readPackageTargetConfig(configPath);
 const scaffold = createRpcAnalysisScaffold({
   entryFile: path.resolve(config.entryFile),
   rootType: config.rootType,
+  rootPath: config.rootPath,
 });
 
 const properties = scaffold.checker.getPropertiesOfType(scaffold.rootType).map((property) => property.getName()).sort();

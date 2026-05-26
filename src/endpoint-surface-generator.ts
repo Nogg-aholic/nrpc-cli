@@ -5,7 +5,8 @@ import {
 	type TypeNodeShape,
 	type VirtualProgramSource,
 	unwrapPromiseLikeType,
-	type CodecPolicies
+	type CodecPolicies,
+	type SurfaceTraversalOptions,
 } from "./codec-generator.js";
 import { analyzeRpcSurface, generateHttpRouteManifest, type RpcAnalysisContext } from "./http-route-generator.js";
 
@@ -20,6 +21,7 @@ export type GenerateEndpointSurfaceOptions = {
 	declarationTypeName?: string;
 	policies?: CodecPolicies;
 	virtualSources?: readonly VirtualProgramSource[];
+	traversal?: SurfaceTraversalOptions;
 };
 
 export type GeneratedEndpointSurfaceResult = {
@@ -47,6 +49,7 @@ export function generateEndpointSurface(options: GenerateEndpointSurfaceOptions)
 		protocolMode: "both",
 		policies: options.policies,
 		virtualSources: options.virtualSources,
+		traversal: options.traversal,
 	});
 	const contractText = renderGeneratedContractModule({
 		rootType: options.rootType,
@@ -142,6 +145,7 @@ function renderGeneratedContractModule(options: RenderGeneratedContractModuleOpt
 		`\ttype RpcMethodRefFromCallable,`,
 		`\tattachRpcMethodMetadata,`,
 		`\tdefineRpcMethodRef,`,
+		`\tmountRpcNamespace,`,
 		`\twithRpcMethodCodec,`,
 		`} from ${JSON.stringify(moduleSpecifier)};`,
 		`import {`,
@@ -162,6 +166,20 @@ function renderGeneratedContractModule(options: RenderGeneratedContractModuleOpt
 		"",
 		`export const ${options.globalName}HttpRouteManifest: HttpRouteManifest = ${JSON.stringify(stripRouteManifestTypeRefs(options.routeManifest), null, 2)};`,
 		"",
+		renderNamespaceInstaller(options.globalName),
+		"",
+	].join("\n");
+}
+
+function renderNamespaceInstaller(globalName: string): string {
+	const installName = `install${renderGeneratedMethodTypeBaseName(globalName)}Namespace`;
+	return [
+		`export function ${installName}<TTarget extends Record<string, unknown>, TSurface>(`,
+		`\ttarget: TTarget,`,
+		`\tsurface: TSurface,`,
+		`): TTarget {`,
+		`\treturn mountRpcNamespace(target, ${globalName}HttpRouteManifest, surface);`,
+		`}`,
 	].join("\n");
 }
 

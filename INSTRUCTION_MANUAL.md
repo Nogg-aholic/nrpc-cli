@@ -2,6 +2,11 @@
 
 This manual is for `@nogg-aholic/nrpc-cli` generation setup only.
 
+Companion documents:
+
+- `nrpc-cli/BUILD_GUIDE.md`: practical build flow, SDK plugin generation flow, and verification commands
+- `nRPC/USAGE_GUIDE.md`: runtime-side wiring after generation is complete
+
 Use this document when you want to:
 
 - install the generator package correctly
