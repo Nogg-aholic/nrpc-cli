@@ -2,7 +2,7 @@
   "name": "@nogg-aholic/nrpc-cli",
   "description": "Code generation and CLI tooling for nRPC.",
   "version": "0.7.2",
-  "homepage": "https://github.com/Nogg-aholic/nRPC#readme",
+  "homepage": "https://github.com/Nogg-aholic/nrpc-cli#readme",
   "license": "MIT",
   "type": "module",
   "bin": {
@@ -134,10 +134,10 @@
   "sideEffects": false,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Nogg-aholic/nRPC"
+    "url": "git+https://github.com/Nogg-aholic/nrpc-cli.git"
   },
   "bugs": {
-    "url": "https://github.com/Nogg-aholic/nRPC/issues"
+    "url": "https://github.com/Nogg-aholic/nrpc-cli/issues"
   },
   "keywords": [
     "rpc",
