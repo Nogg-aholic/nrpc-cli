@@ -16,3 +16,4 @@ export * from './openapi-surface-generator.js';
 export * from './openapi-types.js';
 export * from './scalar-html.js';
 export * from './structural-contract-generator.js';
+export * from './zod-generator.js';

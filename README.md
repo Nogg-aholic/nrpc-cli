@@ -78,6 +78,7 @@ Old patterns like keeping generation entrypoints under `src/` or relying on `con
 Installed binaries:
 
 - `nrpc-generate-codec`
+- `nrpc-generate-zod-schema`
 - `nrpc-generate-declaration-lines`
 - `nrpc-generate-endpoint-surface`
 - `nrpc-generate-endpoint-global-dts`
@@ -97,6 +98,18 @@ nrpc-generate-codec \
 	--args GetChartArgs \
 	--result GetChartResult
 ```
+
+### Generate Zod Schemas From A Service Root
+
+```bash
+nrpc-generate-zod-schema \
+	--in ./src/service.ts \
+	--root ChangeCaseApi \
+	--out ./src/generated/change-case-api.zod.ts \
+	--export-name changeCaseApiZodSchemas
+```
+
+The generated module imports `z` from `zod` and emits per-method input/result schemas plus a nested schema tree for the surface.
 
 ### Generate An Endpoint Surface
 

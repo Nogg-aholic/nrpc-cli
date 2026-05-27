@@ -1,13 +1,14 @@
 {
   "name": "@nogg-aholic/nrpc-cli",
   "description": "Code generation and CLI tooling for nRPC.",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "homepage": "https://github.com/Nogg-aholic/nrpc-cli#readme",
   "license": "MIT",
   "type": "module",
   "bin": {
     "nrpc-generate-declaration-lines": "dist/generate-declaration-lines-cli.js",
     "nrpc-generate-codec": "dist/generate-codec-cli.js",
+    "nrpc-generate-zod-schema": "dist/generate-zod-schema-cli.js",
     "nrpc-generate-endpoint-surface": "dist/generate-endpoint-surface-cli.js",
     "nrpc-generate-endpoint-global-dts": "dist/generate-endpoint-global-dts-cli.js",
     "nrpc-generate-openapi-surface": "dist/generate-openapi-surface-cli.js",
@@ -31,6 +32,11 @@
       "types": "./dist/codec-generator.d.ts",
       "import": "./dist/codec-generator.js",
       "default": "./dist/codec-generator.js"
+    },
+    "./zod-generator": {
+      "types": "./dist/zod-generator.d.ts",
+      "import": "./dist/zod-generator.js",
+      "default": "./dist/zod-generator.js"
     },
     "./contract-runtime-inline-generator": {
       "types": "./dist/contract-runtime-inline-generator.d.ts",
@@ -89,6 +95,10 @@
     "./generate-codec-cli": {
       "types": "./dist/generate-codec-cli.d.ts",
       "import": "./dist/generate-codec-cli.js"
+    },
+    "./generate-zod-schema-cli": {
+      "types": "./dist/generate-zod-schema-cli.d.ts",
+      "import": "./dist/generate-zod-schema-cli.js"
     },
     "./generate-endpoint-surface-cli": {
       "types": "./dist/generate-endpoint-surface-cli.d.ts",

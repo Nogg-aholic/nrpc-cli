@@ -8,6 +8,7 @@ Use this guide when you want to:
 - structure generation code in an app
 - build runtime artifacts from a TypeScript service root
 - generate SDK-style plugin exports
+- generate Zod schemas from a TypeScript service root
 - build docs or MCP artifacts
 - run local repository verification for `nrpc-cli`
 
@@ -167,6 +168,37 @@ Expected output:
 
 - `src/generated/sdk-plugin.contract.ts`
 
+## Zod Schema Generation
+
+If you need runtime validators for a service root, generate a Zod schema module from the same TypeScript surface.
+
+Example:
+
+```ts
+import { generateZodSchemaModule } from '@nogg-aholic/nrpc-cli/zod-generator';
+
+const zodModule = generateZodSchemaModule({
+  entryFile: path.join(projectSrcDir, 'service.ts'),
+  rootType: 'ChangeCaseApi',
+  outputImportPath: path.join(generatedDir, 'change-case-api.zod.ts'),
+  exportName: 'changeCaseApiZodSchemas',
+});
+
+await Bun.write(path.join(generatedDir, 'change-case-api.zod.ts'), zodModule.code);
+```
+
+CLI equivalent:
+
+```bash
+nrpc-generate-zod-schema \
+	--in ./src/service.ts \
+	--root ChangeCaseApi \
+	--out ./src/generated/change-case-api.zod.ts \
+	--export-name changeCaseApiZodSchemas
+```
+
+The generated module imports `z` from `zod`, so the consuming project should install `zod` if it will compile or execute that generated file.
+
 ## Host Build Flow For SDK Plugins
 
 The host package should:
@@ -196,6 +228,7 @@ Then generate the final host artifact with `generateEndpointSurface(...)` or the
 Installed binaries:
 
 - `nrpc-generate-codec`
+- `nrpc-generate-zod-schema`
 - `nrpc-generate-declaration-lines`
 - `nrpc-generate-endpoint-surface`
 - `nrpc-generate-endpoint-global-dts`
