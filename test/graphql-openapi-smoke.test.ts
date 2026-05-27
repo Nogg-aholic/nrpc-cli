@@ -25,8 +25,8 @@ describe('GraphQL smoke artifacts', () => {
     expect(openApiJson).toContain('/graphql/GetProject');
     expect(openApiJson).toContain('/graphql/CreateProject');
 
-    expect(contractText).toContain('export type GetProjectInput');
-    expect(contractText).toContain('export type CreateProjectResult');
+    expect(contractText).toContain('export type GetProject = {');
+    expect(contractText).toContain('export type CreateProject = {');
     expect(contractText).toContain('export const graphqlSmokeRouteManifest');
 
     expect(docsText).toContain('export const docsJson');
