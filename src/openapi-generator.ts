@@ -190,6 +190,47 @@ function tupleToRequestObjectShape(parameterNames: readonly string[], tupleShape
 	};
 }
 
+type OpenApiComponentRegistry = {
+	usedNames: Set<string>;
+	nameByKey: Map<string, string>;
+};
+
+const checkerToComponentRegistryMap = new WeakMap<ts.TypeChecker, OpenApiComponentRegistry>();
+
+function getOrReserveComponentName(
+	shape: Extract<TypeNodeShape, { kind: "object" }>,
+	checker: ts.TypeChecker,
+): string {
+	let registry = checkerToComponentRegistryMap.get(checker);
+	if (!registry) {
+		registry = {
+			usedNames: new Set<string>(),
+			nameByKey: new Map<string, string>(),
+		};
+		checkerToComponentRegistryMap.set(checker, registry);
+	}
+
+	const key = shape.schemaId ?? shape.schemaName;
+	if (!key) {
+		throw new Error("Cannot register object shape without schemaId or schemaName.");
+	}
+	let name = registry.nameByKey.get(key);
+	if (name) {
+		return name;
+	}
+
+	const baseName = shape.schemaName ?? shape.schemaId ?? "GeneratedObject";
+	name = baseName;
+	let counter = 2;
+	while (registry.usedNames.has(name)) {
+		name = `${baseName}${counter}`;
+		counter += 1;
+	}
+	registry.usedNames.add(name);
+	registry.nameByKey.set(key, name);
+	return name;
+}
+
 function typeShapeToOpenApiSchema(
 	shape: TypeNodeShape,
 	checker: ts.TypeChecker,
@@ -259,7 +300,7 @@ function typeShapeToOpenApiSchema(
 			};
 		case "object": {
 			if (shape.schemaId) {
-				const componentKey = shape.schemaName ? `${shape.schemaName}_${shape.schemaId}` : shape.schemaId;
+				const componentKey = getOrReserveComponentName(shape, checker);
 				const existing = components.get(componentKey);
 				if (existing) {
 					return { $ref: `#/components/schemas/${componentKey}` };

@@ -165,6 +165,22 @@ function createNormalizeContext(): NormalizeContext {
 	};
 }
 
+const checkerToIdMap = new WeakMap<ts.TypeChecker, Map<number, number>>();
+
+function getDeterministicTypeId(typeId: number, checker: ts.TypeChecker): number {
+	let idMap = checkerToIdMap.get(checker);
+	if (!idMap) {
+		idMap = new Map<number, number>();
+		checkerToIdMap.set(checker, idMap);
+	}
+	let detId = idMap.get(typeId);
+	if (detId === undefined) {
+		detId = idMap.size + 1;
+		idMap.set(typeId, detId);
+	}
+	return detId;
+}
+
 function normalizeTypeInternal(
 	type: ts.Type,
 	checker: ts.TypeChecker,
@@ -173,9 +189,10 @@ function normalizeTypeInternal(
 	context: NormalizeContext,
 ): TypeNodeShape {
 	type = unwrapPromiseLikeType(type, checker);
-	const typeId = typeof (type as ts.Type & { id?: unknown }).id === "number"
+	const rawTypeId = typeof (type as ts.Type & { id?: unknown }).id === "number"
 		? ((type as ts.Type & { id?: number }).id as number)
 		: undefined;
+	const typeId = rawTypeId !== undefined ? getDeterministicTypeId(rawTypeId, checker) : undefined;
 	const finish = (shape: TypeNodeShape): TypeNodeShape => {
 		if (typeId !== undefined) {
 			context.cache.set(typeId, shape);
