@@ -1,7 +1,7 @@
 {
   "name": "@nogg-aholic/nrpc-cli",
   "description": "Code generation and CLI tooling for nRPC.",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "homepage": "https://github.com/Nogg-aholic/nrpc-cli#readme",
   "license": "MIT",
   "type": "module",
@@ -13,7 +13,8 @@
     "nrpc-generate-endpoint-global-dts": "dist/generate-endpoint-global-dts-cli.js",
     "nrpc-generate-openapi-surface": "dist/generate-openapi-surface-cli.js",
     "nrpc-generate-graphql-openapi-surface": "dist/generate-graphql-openapi-surface-cli.js",
-    "nrpc-generate-package-target": "dist/generate-package-target-cli.js"
+    "nrpc-generate-package-target": "dist/generate-package-target-cli.js",
+    "nrpc-generate-vercel": "dist/generate-vercel-cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -119,6 +120,10 @@
     "./generate-endpoint-global-dts-cli": {
       "types": "./dist/generate-endpoint-global-dts-cli.d.ts",
       "import": "./dist/generate-endpoint-global-dts-cli.js"
+    },
+    "./generate-vercel-cli": {
+      "types": "./dist/generate-vercel-cli.d.ts",
+      "import": "./dist/generate-vercel-cli.js"
     },
     "./structural-contract-generator": {
       "types": "./dist/structural-contract-generator.d.ts",

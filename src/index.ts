@@ -5,6 +5,7 @@ export * from './docs.js';
 export * from './docs-runtime.js';
 export * from './endpoint-surface-generator.js';
 export * from './package-target-generator.js';
+export * from './generate-vercel-cli.js';
 export * from './graphql/openapi-generator.js';
 export * from './graphql/operation-analyzer.js';
 export * from './graphql/postman-collection.js';
