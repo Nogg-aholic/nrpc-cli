@@ -114,12 +114,15 @@ export default createRpcFetchRequestHandler({
 `);
 
   if (openApiSurface?.mcpToolsText) {
+    const mcpToolsFunctionNameMatch = openApiSurface.mcpToolsText.match(/export function (create\w+McpTools)/);
+    const mcpToolsFunctionName = mcpToolsFunctionNameMatch ? mcpToolsFunctionNameMatch[1] : 'createOpenApiMcpTools';
+
     await writeFile(path.join(outDir, 'mcp.ts'), `// AUTO-GENERATED FILE. DO NOT EDIT.
 import { createMcpHttpHandler } from '@nogg-aholic/nrpc/mcp-http-handler';
-import { createOpenApiMcpTools } from '${mcpToolsImportPath}';
+import { ${mcpToolsFunctionName} } from '${mcpToolsImportPath}';
 
 const mcpHandler = createMcpHttpHandler({
-  tools: createOpenApiMcpTools({ baseUrl: process.env.VERCEL_URL ?? 'http://localhost:3000' }),
+  tools: ${mcpToolsFunctionName}({ baseUrl: process.env.VERCEL_URL ?? 'http://localhost:3000' }),
   serverName: '${globalName}',
   serverVersion: '1.0.0',
 });
