@@ -12,6 +12,7 @@ import {
 import { analyzeRpcSurface, createRpcAnalysisScaffold, generateHttpRouteManifest, type RpcAnalysisScaffold } from "./http-route-generator.js";
 import { renderScalarHtml, type RenderScalarHtmlOptions } from "./scalar-html.js";
 import type { OpenApiDocument, OpenApiHttpMethod, OpenApiMethodDocs, OpenApiMethodProjection, OpenApiOperation, OpenApiSchema } from "./openapi-types.js";
+import { buildMethodMdDoc, renderMethodMarkdown } from "./md-docs-generator.js";
 
 export type GenerateOpenApiDocumentOptions = {
 	entryFile: string;
@@ -25,6 +26,7 @@ export type GenerateOpenApiDocumentOptions = {
 	docs?: Record<string, OpenApiMethodDocs>;
 	virtualSources?: readonly VirtualProgramSource[];
 	traversal?: SurfaceTraversalOptions;
+	includeImplementationDocs?: boolean;
 };
 
 export type GenerateOpenApiArtifactsOptions = GenerateOpenApiDocumentOptions & {
@@ -148,10 +150,15 @@ export function buildOpenApiDocumentFromProjections(
 }
 
 function buildOpenApiOperation(projection: OpenApiMethodProjection): OpenApiOperation {
+	const description = [
+		projection.docs?.description,
+		projection.implementationMd ? `\n\n---\n\n${projection.implementationMd}` : undefined,
+	].filter(Boolean).join("\n\n");
+
 	return {
 		operationId: projection.methodName,
 		...(projection.docs?.summary ? { summary: projection.docs.summary } : {}),
-		...(projection.docs?.description ? { description: projection.docs.description } : {}),
+		...(description ? { description } : {}),
 		...(projection.docs?.tags?.length ? { tags: projection.docs.tags } : { tags: inferTags(projection.methodName) }),
 		...(projection.httpMethod === "post" ? {
 			requestBody: {
@@ -428,6 +435,21 @@ function buildMethodProjectionFromMethod(
 	);
 	const docs = options.docs?.[method.methodName];
 
+	let implementationMd: string | undefined;
+	if (options.includeImplementationDocs) {
+		try {
+			const doc = buildMethodMdDoc(method, analysis.checker, analysis.program, {
+				entryFile: options.entryFile,
+				rootType: options.rootType,
+				outputDir: "",
+				includeImplementation: true,
+			}, "");
+			implementationMd = renderMethodMarkdown(doc);
+		} catch (error) {
+			console.warn(`Failed to generate implementation docs for ${method.methodName}:`, error);
+		}
+	}
+
 function normalizeOpenApiMethodResultType(
 	method: CollectedRpcMethod,
 	checker: ts.TypeChecker,
@@ -450,6 +472,7 @@ function normalizeOpenApiMethodResultType(
 		requestSchema,
 		responseSchema,
 		requestRequired: method.argsShape.kind === "tuple" && method.argsShape.elements.some((shape) => !isOptionalShape(shape)),
+		implementationMd,
 		effects: method.effects,
 		genericTypeParameters: [...method.genericTypeParameters],
 		parameterNames: [...method.parameterNames],

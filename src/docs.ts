@@ -27,7 +27,10 @@ export type RenderGeneratedDocsArtifactsModuleOptions = {
 };
 
 export function generateDocsArtifacts(options: GenerateDocsArtifactsOptions): GeneratedDocsArtifacts {
-	const artifacts = generateOpenApiArtifacts(options);
+	const artifacts = generateOpenApiArtifacts({
+		...options,
+		includeImplementationDocs: true,
+	});
 	return {
 		json: artifacts.document,
 		html: artifacts.html,
@@ -185,6 +188,7 @@ function renderInlinedGeneratedDocsRuntimeModule(): string {
 		'  requestSchema: OpenApiSchema;',
 		'  responseSchema: OpenApiSchema;',
 		'  requestRequired: boolean;',
+		'  implementationMd?: string;',
 		'  effects: OpenApiMethodEffects;',
 		'  memberAbiFlags: OpenApiMemberAbiFlags;',
 		'  nodeAbiFlags: OpenApiNodeAbiFlags;',
@@ -224,6 +228,7 @@ function renderInlinedGeneratedDocsRuntimeModule(): string {
 		'    requestSchema: unknown;',
 		'    responseSchema: unknown;',
 		'    requestRequired: boolean;',
+		'    implementationMd?: string;',
 		'    effects: OpenApiMethodEffects;',
 		'    components?: {',
 		'      schemas: Record<string, unknown>;',
@@ -355,7 +360,7 @@ function renderInlinedGeneratedDocsRuntimeModule(): string {
 		"        [projection.httpMethod ?? 'post']: {",
 		'          operationId: projection.methodName,',
 		'          ...(projection.docs?.summary ? { summary: projection.docs.summary } : {}),',
-		'          ...(projection.docs?.description ? { description: projection.docs.description } : {}),',
+		'          ...(projection.docs?.description || projection.implementationMd ? { description: [projection.docs?.description, projection.implementationMd ? `\\n\\n---\\n\\n${projection.implementationMd}` : undefined].filter(Boolean).join("\\n\\n") } : {}),',
 		'          ...(projection.docs?.tags?.length ? { tags: projection.docs.tags } : { tags: inferTags(projection.methodName) }),',
 		"          ...(projection.httpMethod === 'get' ? {} : {",
 		'            requestBody: {',
@@ -427,12 +432,12 @@ export function renderGeneratedDocsArtifactsModule(
 		'',
 		`export const ${htmlExportName} = ${JSON.stringify(artifacts.html)};`,
 		'',
-		`export const ${methodsExportName}: ReadonlyMap<string, { methodName: string; httpPath: string; requestSchema: unknown; responseSchema: unknown; requestRequired: boolean; effects: OpenApiMethodEffects; genericTypeParameters?: string[]; parameterNames?: string[]; parameterOptionalFlags?: boolean[]; parameterRestFlags?: boolean[]; parameterTypeTexts?: string[]; resultTypeText?: string; symbolSemanticFlags?: OpenApiSymbolSemanticFlags; symbolRelations?: OpenApiSymbolRelationSet; memberAbiFlags?: OpenApiMemberAbiFlags; nodeAbiFlags?: OpenApiNodeAbiFlags; components?: { schemas: Record<string, unknown> }; docs?: { summary?: string; description?: string; returnsDescription?: string; tags?: string[]; params?: Record<string, string> } }> = new Map(${methodsEntriesText}) as ReadonlyMap<string, { methodName: string; httpPath: string; requestSchema: unknown; responseSchema: unknown; requestRequired: boolean; effects: OpenApiMethodEffects; genericTypeParameters?: string[]; parameterNames?: string[]; parameterOptionalFlags?: boolean[]; parameterRestFlags?: boolean[]; parameterTypeTexts?: string[]; resultTypeText?: string; symbolSemanticFlags?: OpenApiSymbolSemanticFlags; symbolRelations?: OpenApiSymbolRelationSet; memberAbiFlags?: OpenApiMemberAbiFlags; nodeAbiFlags?: OpenApiNodeAbiFlags; components?: { schemas: Record<string, unknown> }; docs?: { summary?: string; description?: string; returnsDescription?: string; tags?: string[]; params?: Record<string, string> } }>;`,
+		`export const ${methodsExportName}: ReadonlyMap<string, { methodName: string; httpPath: string; requestSchema: unknown; responseSchema: unknown; requestRequired: boolean; implementationMd?: string; effects: OpenApiMethodEffects; genericTypeParameters?: string[]; parameterNames?: string[]; parameterOptionalFlags?: boolean[]; parameterRestFlags?: boolean[]; parameterTypeTexts?: string[]; resultTypeText?: string; symbolSemanticFlags?: OpenApiSymbolSemanticFlags; symbolRelations?: OpenApiSymbolRelationSet; memberAbiFlags?: OpenApiMemberAbiFlags; nodeAbiFlags?: OpenApiNodeAbiFlags; components?: { schemas: Record<string, unknown> }; docs?: { summary?: string; description?: string; returnsDescription?: string; tags?: string[]; params?: Record<string, string> } }> = new Map(${methodsEntriesText}) as ReadonlyMap<string, { methodName: string; httpPath: string; requestSchema: unknown; responseSchema: unknown; requestRequired: boolean; implementationMd?: string; effects: OpenApiMethodEffects; genericTypeParameters?: string[]; parameterNames?: string[]; parameterOptionalFlags?: boolean[]; parameterRestFlags?: boolean[]; parameterTypeTexts?: string[]; resultTypeText?: string; symbolSemanticFlags?: OpenApiSymbolSemanticFlags; symbolRelations?: OpenApiSymbolRelationSet; memberAbiFlags?: OpenApiMemberAbiFlags; nodeAbiFlags?: OpenApiNodeAbiFlags; components?: { schemas: Record<string, unknown> }; docs?: { summary?: string; description?: string; returnsDescription?: string; tags?: string[]; params?: Record<string, string> } }>;`,
 		'',
 		`const ${runtimeExportName}Artifacts: GeneratedDocsRuntimeArtifacts = {`,
 		`  json: ${jsonExportName},`,
 		`  html: ${htmlExportName},`,
-		`  methods: ${methodsExportName} as ReadonlyMap<string, { methodName: string; httpPath: string; requestSchema: unknown; responseSchema: unknown; requestRequired: boolean; effects: OpenApiMethodEffects; components?: { schemas: Record<string, unknown> }; docs?: { summary?: string; description?: string; returnsDescription?: string; tags?: string[]; params?: Record<string, string> } }>,`,
+		`  methods: ${methodsExportName} as ReadonlyMap<string, { methodName: string; httpPath: string; requestSchema: unknown; responseSchema: unknown; requestRequired: boolean; implementationMd?: string; effects: OpenApiMethodEffects; components?: { schemas: Record<string, unknown> }; docs?: { summary?: string; description?: string; returnsDescription?: string; tags?: string[]; params?: Record<string, string> } }>,`,
 		`};`,
 		'',
 		`export const ${runtimeExportName} = {`,

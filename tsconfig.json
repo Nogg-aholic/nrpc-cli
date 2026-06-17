@@ -8,8 +8,8 @@
     "types": ["node", "bun"],
     "baseUrl": ".",
     "paths": {
-      "@nogg-aholic/nrpc": ["../nRPC/dist/index.d.ts", "../nRPC/src/index.ts"],
-      "@nogg-aholic/nrpc/*": ["../nRPC/dist/*.d.ts", "../nRPC/src/*.ts"]
+      "@nogg-aholic/nrpc": ["../nRPC/src/index.ts"],
+      "@nogg-aholic/nrpc/*": ["../nRPC/src/*.ts"]
     },
     "rootDir": "./src",
     "outDir": "./dist",

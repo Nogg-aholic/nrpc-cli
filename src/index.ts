@@ -18,3 +18,5 @@ export * from './scalar-html.js';
 export * from './structural-contract-generator.js';
 export * from './zod-generator.js';
 export * from './vercel-generator.js';
+export * from './md-docs-generator.js';
+export * from './generate-scalar-config.js';

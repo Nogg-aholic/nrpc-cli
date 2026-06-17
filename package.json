@@ -14,7 +14,8 @@
     "nrpc-generate-openapi-surface": "dist/generate-openapi-surface-cli.js",
     "nrpc-generate-graphql-openapi-surface": "dist/generate-graphql-openapi-surface-cli.js",
     "nrpc-generate-package-target": "dist/generate-package-target-cli.js",
-    "nrpc-generate-vercel": "dist/generate-vercel-cli.js"
+    "nrpc-generate-vercel": "dist/generate-vercel-cli.js",
+    "nrpc-generate-md-docs": "dist/generate-md-docs-cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -88,6 +89,11 @@
       "types": "./dist/openapi-generator.d.ts",
       "import": "./dist/openapi-generator.js",
       "default": "./dist/openapi-generator.js"
+    },
+    "./md-docs-generator": {
+      "types": "./dist/md-docs-generator.d.ts",
+      "import": "./dist/md-docs-generator.js",
+      "default": "./dist/md-docs-generator.js"
     },
     "./generate-declaration-lines-cli": {
       "types": "./dist/generate-declaration-lines-cli.d.ts",

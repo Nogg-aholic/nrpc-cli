@@ -148,6 +148,7 @@ export type OpenApiMethodProjection = {
 	requestSchema: OpenApiSchema;
 	responseSchema: OpenApiSchema;
 	requestRequired: boolean;
+	implementationMd?: string;
 	effects: OpenApiMethodEffects;
 	memberAbiFlags: OpenApiMemberAbiFlags;
 	nodeAbiFlags: OpenApiNodeAbiFlags;

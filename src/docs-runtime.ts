@@ -18,6 +18,7 @@ export type GeneratedDocsRuntimeArtifacts = {
 		requestSchema: unknown;
 		responseSchema: unknown;
 		requestRequired: boolean;
+		implementationMd?: string;
 		effects: OpenApiMethodProjection['effects'];
 		components?: {
 			schemas: Record<string, unknown>;
@@ -121,6 +122,11 @@ function buildOpenApiMethodDocumentFromProjection(
 		? projection.docs.tags
 		: inferTags(projection.methodName);
 
+	const description = [
+		projection.docs?.description,
+		projection.implementationMd ? `\n\n---\n\n${projection.implementationMd}` : undefined,
+	].filter(Boolean).join('\n\n');
+
 	return {
 		openapi: '3.1.0',
 		info: {
@@ -134,7 +140,7 @@ function buildOpenApiMethodDocumentFromProjection(
 				[projection.httpMethod ?? 'post']: {
 					operationId: projection.methodName,
 					...(projection.docs?.summary ? { summary: projection.docs.summary } : {}),
-					...(projection.docs?.description ? { description: projection.docs.description } : {}),
+					...(description ? { description } : {}),
 					...(projection.docs?.tags?.length ? { tags: projection.docs.tags } : { tags: inferTags(projection.methodName) }),
 					...(projection.httpMethod === 'get' ? {} : {
 						requestBody: {

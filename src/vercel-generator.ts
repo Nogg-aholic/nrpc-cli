@@ -16,9 +16,14 @@ export async function generateVercelArtifacts(options: {
   contractFile: string;
   docsFile: string;
   openApiSurface?: { mcpToolsText?: string };
+  protocolMode?: 'binary' | 'json' | 'both';
 }) {
-  const { entryFile, outDir, rootType, globalName, rootPath, contractFile, docsFile, openApiSurface } = options;
+  const { entryFile, outDir, rootType, globalName, rootPath, contractFile, docsFile, openApiSurface, protocolMode } = options;
   const analysis = analyzeRpcSurface({ entryFile, rootType, rootPath, policies: {} });
+  const effectiveProtocolMode = protocolMode ?? 'both';
+  
+  // Deduplicate methods by their full path to avoid duplicate files
+  const seenMethodPaths = new Set<string>();
 
   await mkdir(outDir, { recursive: true });
 
@@ -29,26 +34,64 @@ export async function generateVercelArtifacts(options: {
 
   for (const method of analysis.methods) {
     if (method.effects.reason === 'property access') continue;
-    const methodPathParts = method.path.slice(rootPath.length);
-    const methodFilePath = path.join(outDir, ...methodPathParts) + '.ts';
+    
+    // Skip if we've already processed this method path
+    const methodPathKey = method.path.join('.');
+    if (seenMethodPaths.has(methodPathKey)) continue;
+    seenMethodPaths.add(methodPathKey);
+    
+    // Make method.path relative to analysis.rootPath
+    const pathStartsWithAnalysisRoot = analysis.rootPath.length > 0 && 
+      method.path.length >= analysis.rootPath.length &&
+      method.path.slice(0, analysis.rootPath.length).join('.') === analysis.rootPath.join('.');
+    
+    const relativePathParts = pathStartsWithAnalysisRoot 
+      ? method.path.slice(analysis.rootPath.length)
+      : method.path;
+    
+    // Reconstruct full path for manifest: rootPath + method.path
+    const fullPathParts = [...rootPath, ...method.path];
+    const httpPath = `/${fullPathParts.join('/')}`;
+    
+    // Use relative path for file path
+    const methodFilePath = path.join(outDir, ...relativePathParts) + '.ts';
     await mkdir(path.dirname(methodFilePath), { recursive: true });
     
     const methodRelativeDocsImportPath = toRelativeImport(path.dirname(methodFilePath), docsFile);
     const methodRelativeContractImportPath = toRelativeImport(path.dirname(methodFilePath), contractFile);
     const methodRelativeEntryPath = toRelativeImport(path.dirname(methodFilePath), entryFile);
 
+    // For single-route manifest, rootPath should be full path without the method name
+    
+    // For single-route manifest, rootPath should be full path without the method name
+    const methodRootPath = fullPathParts.slice(0, -1);
+    
+    const singleRouteManifest = {
+      id: analysis.rootPath[analysis.rootPath.length - 1] ?? globalName,
+      rootPath: methodRootPath,
+      basePath: '',
+      protocolMode: effectiveProtocolMode,
+      routes: [{
+        methodName: method.methodName,
+        pathParts: fullPathParts,
+        httpPath: httpPath,
+        codecLookupKey: method.methodName,
+        protocolMode: effectiveProtocolMode,
+      }],
+    };
+
     const content = `// AUTO-GENERATED FILE. DO NOT EDIT.
 import { createSyntheticHttpRouteHandler } from '@nogg-aholic/nrpc/web-runtime';
 import { createRpcMethodInvoker } from '@nogg-aholic/nrpc';
 import { createHostService } from '${methodRelativeEntryPath}';
-import { ${globalName}CodecRegistry, ${globalName}HttpRouteManifest } from '${methodRelativeContractImportPath}';
+import { ${globalName}CodecRegistry } from '${methodRelativeContractImportPath}';
 import { generatedDocsRuntime } from '${methodRelativeDocsImportPath}';
 
 const service = createHostService();
 const invokeRpcMethod = createRpcMethodInvoker(service);
 
 const handler = createSyntheticHttpRouteHandler({
-  manifest: ${globalName}HttpRouteManifest,
+  manifest: ${JSON.stringify(singleRouteManifest, null, 2)},
   codecResolver: ${globalName}CodecRegistry,
   invokeMethod: invokeRpcMethod,
 });
@@ -72,7 +115,7 @@ export default async function (req: Request) {
     await writeFile(methodFilePath, content);
 
     // Generate method-specific docs handler at [methodPath]/_docs.ts
-    const methodDocsDir = path.join(outDir, ...methodPathParts);
+    const methodDocsDir = path.join(outDir, ...method.path);
     const methodDocsFilePath = path.join(methodDocsDir, '_docs.ts');
     await mkdir(methodDocsDir, { recursive: true });
 

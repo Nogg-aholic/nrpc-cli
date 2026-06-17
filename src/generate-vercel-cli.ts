@@ -23,6 +23,7 @@ const globalName = readArg('--global');
 const rootPath = readListArg('--root-path');
 const rootTypeName = readArg('--root-type');
 const openApiFile = readArg('--openapi');
+const protocolMode = readArg('--protocol-mode') as 'binary' | 'json' | 'both' | undefined;
 
 if (!entryFile) throw new Error('Missing --entry <path>');
 if (!outDir) throw new Error('Missing --out <directory>');
@@ -54,6 +55,7 @@ await generateVercelArtifacts({
   contractFile: path.join(resolvedOutDir, '..', 'generated', `${globalName}-api.contract.ts`),
   docsFile: path.join(resolvedOutDir, '..', 'generated', `${globalName}-api.surface.docs.ts`),
   openApiSurface: openApiSurface ? { mcpToolsText: openApiSurface.mcpToolsText } : undefined,
+  protocolMode,
 });
 
 console.log(`Generated Vercel API route at ${path.join(resolvedOutDir, '[...path].ts')}`);
