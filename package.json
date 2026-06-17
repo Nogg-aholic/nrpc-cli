@@ -1,7 +1,7 @@
 {
   "name": "@nogg-aholic/nrpc-cli",
   "description": "Code generation and CLI tooling for nRPC.",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "homepage": "https://github.com/Nogg-aholic/nrpc-cli#readme",
   "license": "MIT",
   "type": "module",
